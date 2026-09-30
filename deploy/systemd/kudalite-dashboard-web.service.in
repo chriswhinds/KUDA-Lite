@@ -1,0 +1,27 @@
+[Unit]
+Description=KUDA-Lite dashboard web front end (Next.js)
+After=network-online.target kudalite-dashboard-api.service
+Wants=network-online.target kudalite-dashboard-api.service
+
+[Service]
+Type=simple
+User=kudalite
+Group=kudalite
+EnvironmentFile=/etc/kudalite/dashboard.env
+WorkingDirectory=@DASHBOARD_DIR@/web
+ExecStart=@NODE@ server.js
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

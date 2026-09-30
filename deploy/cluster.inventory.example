@@ -1,0 +1,15 @@
+# KUDA-Lite cluster inventory, read by deploy/deploy-cluster.sh.
+# Copy to deploy/cluster.inventory and edit.
+#
+# One line per node:   <role>  <ssh host>  [ssh user]
+#   role: controller (exactly one) | worker | dashboard
+# The ssh host must resolve from the machine you deploy from (name or IP). Workers are told to
+# reach the controller at the controller line's host, so it must also resolve on the workers.
+# "dashboard" may name the controller Pi (the usual choice) or any other Linux machine.
+
+controller  pi5-ctl  pi
+worker      pi5-w0   pi
+worker      pi5-w1   pi
+worker      pi5-w2   pi
+worker      pi5-w3   pi
+dashboard   pi5-ctl  pi

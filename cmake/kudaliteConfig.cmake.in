@@ -1,0 +1,10 @@
+# find_package(kudalite) for host applications:
+#
+#   find_package(kudalite 0.2 REQUIRED)
+#   target_link_libraries(my_app PRIVATE kudalite::kudalite)
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+include("${CMAKE_CURRENT_LIST_DIR}/kudaliteTargets.cmake")
+check_required_components(kudalite)

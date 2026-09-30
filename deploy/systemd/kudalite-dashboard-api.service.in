@@ -1,0 +1,27 @@
+[Unit]
+Description=KUDA-Lite dashboard API (FastAPI)
+After=network-online.target kudalite-controller.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kudalite
+Group=kudalite
+EnvironmentFile=/etc/kudalite/dashboard.env
+WorkingDirectory=@DASHBOARD_DIR@/backend
+ExecStart=@DASHBOARD_DIR@/backend/.venv/bin/uvicorn app.main:app --host ${API_HOST} --port ${API_PORT} --no-access-log
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

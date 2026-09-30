@@ -1,0 +1,36 @@
+[Unit]
+Description=KUDA-Lite worker
+Documentation=file://@KUDALITE_DOCDIR@/DEPLOYMENT.md
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kudalite
+Group=kudalite
+ExecStart=@KUDALITE_BINDIR@/cl-worker --config /etc/kudalite/worker.conf
+# The worker exits when it loses the controller (its memory belonged to that controller's
+# cluster); systemd restarts it and it rejoins with an empty arena. It also retries until the
+# controller is reachable, so start order does not matter.
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+# The arena is most of the Pi's RAM; if the kernel must kill something, prefer the worker over
+# sshd and the rest of the system so the node stays reachable.
+OOMScoreAdjust=500
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

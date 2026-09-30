@@ -1,0 +1,62 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "release",
+      "displayName": "Release (this machine)",
+      "description": "Optimised build of everything for the machine you are on (Linux or macOS host, or a Pi).",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "pi5",
+      "displayName": "Raspberry Pi 5 (native)",
+      "description": "Run on a Pi 5: tuned for Cortex-A76.",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/pi5",
+      "cacheVariables": { "KUDALITE_CPU": "pi5" }
+    },
+    {
+      "name": "pi5-cross",
+      "displayName": "Raspberry Pi 5 (cross-compile from x86-64 Linux)",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/pi5-cross",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/aarch64-linux-gnu.cmake",
+      "cacheVariables": { "KUDALITE_CPU": "pi5", "KUDALITE_BUILD_TESTS": "OFF", "KUDALITE_BUILD_EXAMPLES": "OFF" }
+    },
+    {
+      "name": "host",
+      "displayName": "Host only (library + tools, e.g. macOS)",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/host",
+      "cacheVariables": { "KUDALITE_BUILD_CONTROLLER": "OFF", "KUDALITE_BUILD_WORKER": "OFF", "KUDALITE_BUILD_TESTS": "OFF" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "KUDALITE_WERROR": "ON" }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "binaryDir": "${sourceDir}/build/tsan",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "KUDALITE_SANITIZER": "thread" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "pi5", "configurePreset": "pi5" },
+    { "name": "pi5-cross", "configurePreset": "pi5-cross" },
+    { "name": "host", "configurePreset": "host" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "tsan", "configurePreset": "tsan" }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "unit", "configurePreset": "release", "filter": { "include": { "label": "unit" } }, "output": { "outputOnFailure": true } },
+    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true }, "environment": { "TSAN_OPTIONS": "halt_on_error=1" } }
+  ]
+}
