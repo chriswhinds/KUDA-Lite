@@ -96,6 +96,7 @@ docs/                      design documentation (below)
 | Document | Contents |
 |---|---|
 | [Building](docs/BUILD.md) | CMake presets and options, tests, install layout, cross-compiling, using the library |
+| [Power](docs/POWER.md) | Estimated power for a 5-Pi cluster + switch: idle, compute, peak, running cost, PSU/PoE/UPS advice |
 | [Deployment](docs/DEPLOYMENT.md) | Preparing the Pis, deploying the whole cluster, configuration, operations, troubleshooting |
 | [Architecture](docs/ARCHITECTURE.md) | Components, threading, execution and stream model, sequence diagrams, failure model, design decisions |
 | [Memory Model](docs/MEMORY_MODEL.md) | Global address space, page striping, address translation, allocation, consistency and caching |

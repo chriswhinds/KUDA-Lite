@@ -35,9 +35,9 @@ This guide takes you from a pile of Raspberry Pi 5 boards to a running cluster w
 |---|---|---|
 | Raspberry Pi 5 | 8 GB (4 GB and 16 GB also work) | Global memory is roughly 4.8 GB per 8 GB worker |
 | **Cooling** | **Official Active Cooler (or equivalent) on every Pi** | Sustained kernels run at 100% on all cores; without active cooling the SoC throttles at 80–85 °C (the dashboard shows this) |
-| Power | Official 27 W USB-C PSU per Pi, or a PoE+ HAT | Under-voltage causes throttling and crashes |
+| Power | Official 27 W USB-C PSU per Pi, or a PoE+ HAT | Under-voltage causes throttling and crashes. A 5-Pi cluster draws about 22 W idle and 56–67 W under load; see [POWER.md](POWER.md) |
 | Storage | 32 GB+ A2 microSD, or NVMe via HAT | KUDA-Lite does not use disk at runtime; this is only for the OS |
-| Network | Unmanaged **gigabit** switch, Cat 6 cables | All global-memory traffic crosses it |
+| Network | Unmanaged **gigabit** switch (8-port for up to 6 workers plus an uplink), Cat 6 cables | All global-memory traffic crosses it |
 | Optional | 2.5 GbE HAT on the controller | Host copies flow through the controller ([MATMUL.md §4](MATMUL.md#4-performance-model-pi-5-cluster-1-gbe)) |
 
 ## 3. Prepare each Pi
