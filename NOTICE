@@ -1,0 +1,16 @@
+KUDA-Lite
+Copyright 2026 Christopher Hinds, Stratum Labs
+
+This product includes software developed by Christopher Hinds, Stratum Labs.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this software except in compliance with the License. A copy of the
+License is in the LICENSE file and at http://www.apache.org/licenses/LICENSE-2.0
+
+Third-party software: the dashboard installs its dependencies at build time
+(including Next.js, React, FastAPI, Uvicorn and Pydantic). They are not
+included in this distribution and are provided under their own licenses.
+
+Trademarks: CUDA is a trademark of NVIDIA Corporation. KUDA-Lite is an
+independent project and is not affiliated with, endorsed by, or sponsored by
+NVIDIA. Raspberry Pi is a trademark of Raspberry Pi Ltd.

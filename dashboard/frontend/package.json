@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Live telemetry dashboard for a KUDA-Lite Raspberry Pi 5 cluster",
+  "license": "Apache-2.0",
+  "author": "Christopher Hinds, Stratum Labs",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

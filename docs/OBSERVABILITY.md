@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # KUDA-Lite Observability
 
 Every Pi in the cluster (each worker and the controller) measures its own health and activity once a second. The controller keeps a rolling history per node and serves it to any host. Three consumers are provided:

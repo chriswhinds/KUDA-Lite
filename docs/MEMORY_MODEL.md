@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # KUDA-Lite Memory Model
 
 The RAM of every worker is pooled into one **global memory** that the host sees as device memory and that every kernel, on every worker, can read and write. This document defines how that works.

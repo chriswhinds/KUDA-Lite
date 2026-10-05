@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # Building KUDA-Lite
 
 KUDA-Lite builds with CMake (≥ 3.21) and any C++17 compiler: GCC ≥ 9 or Clang ≥ 10 on Linux, and Apple Clang on macOS. It has no third-party C++ dependencies. The dashboard is built separately (see [§7](#7-dashboard)).

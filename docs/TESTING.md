@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # KUDA-Lite Testing
 
 ## 1. Test inventory

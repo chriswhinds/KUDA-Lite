@@ -1,3 +1,6 @@
+# Copyright 2026 Christopher Hinds, Stratum Labs
+# SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+
 -r requirements.txt
 pytest==9.1.1
 httpx2==2.13.1

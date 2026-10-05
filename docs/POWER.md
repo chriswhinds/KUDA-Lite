@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # Power Requirements: 5 × Raspberry Pi 5 Cluster
 
 Estimated electrical power for the reference KUDA-Lite cluster: **1 controller Pi 5, 4 worker Pi 5s, and one gigabit network switch.**

@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # Deploying KUDA-Lite on a Raspberry Pi 5 Cluster
 
 This guide takes you from a pile of Raspberry Pi 5 boards to a running cluster with the dashboard, and then covers day-to-day operation. For building from source by hand, see [BUILD.md](BUILD.md).

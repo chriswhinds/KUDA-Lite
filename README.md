@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # KUDA-Lite
 
 KUDA-Lite is a runtime modelled on NVIDIA CUDA that makes a cluster of Raspberry Pi 5 boards look like **one compute device** to a program running on a Linux or macOS machine.
@@ -141,6 +146,12 @@ deploy/deploy-cluster.sh install && deploy/deploy-cluster.sh verify
 Code, documentation, the build system (CMake), configuration (`/etc/kudalite/*.conf`), systemd services, and install/deploy scripts are complete. They have been verified on a simulated cluster on one Linux machine: unit tests, integration tests, ThreadSanitizer, the full dashboard stack, and `install.sh` run inside a sandbox. **They have not yet run on Raspberry Pi hardware or on macOS**; [Testing](docs/TESTING.md) lists exactly what was checked and the hardware acceptance plan.
 
 > **Security:** the protocol is unauthenticated and unencrypted. Run the cluster on a private network segment. Workers only execute kernels compiled into their own binary; no code is ever sent over the network.
+
+## License
+
+Copyright 2026 Christopher Hinds, Stratum Labs.
+
+KUDA-Lite is licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution and trademark notices. Every source file carries the standard Apache 2.0 header with `SPDX-License-Identifier: Apache-2.0`.
 
 ---
 

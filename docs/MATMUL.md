@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Christopher Hinds, Stratum Labs
+SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+-->
+
 # Test Case 1: Matrix Multiplication
 
 `C = α·A·B + β·C`, with A (M×K), B (K×N) and C (M×N) row-major, in `float` (`cl_sgemm`) or `double` (`cl_dgemm`).
