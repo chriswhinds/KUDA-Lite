@@ -70,7 +70,7 @@ The worker opens the connection. After that, requests flow in both directions.
 | `AllocAdd` | 202 | C → W | `u64 base, u64 size, u64 pageSize, u32 n, n × u32 owner, n × u64 localBase` | – |
 | `AllocRemove` | 203 | C → W | `u64 base` | – |
 | `ExecBlocks` | 204 | C → W | `u64 launchId, str kernel, dim3 grid, dim3 block, blob args, u64 blockBegin, u64 blockEnd` | `u64 elapsedNs, u64 blocksRun` |
-| `Telemetry` | 205 | W → C | one telemetry sample blob, every `--telemetry-ms` ([OBSERVABILITY.md §4](OBSERVABILITY.md#4-wire-format)) | – |
+| `Telemetry` | 205 | W → C | one telemetry sample blob (version 2 since 0.3: adds the board model), every `--telemetry-ms` ([OBSERVABILITY.md §4](OBSERVABILITY.md#4-wire-format)) | – |
 
 Ordering guarantees the design relies on:
 

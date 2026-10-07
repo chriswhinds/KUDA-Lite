@@ -5,13 +5,13 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 # KUDA-Lite Observability
 
-Every Pi in the cluster (each worker and the controller) measures its own health and activity once a second. The controller keeps a rolling history per node and serves it to any host. Three consumers are provided:
+Every board in the cluster (each worker and the controller) measures its own health and activity once a second. The controller keeps a rolling history per node and serves it to any host. Three consumers are provided:
 
 | Consumer | What it is | Where |
 |---|---|---|
 | `clGetTelemetry()` | Host API call: latest sample for every node plus cluster counters | [`kudalite.h`](../include/kudalite/kudalite.h) |
 | `cl-top` | Terminal view, refreshed every second | [`tools/cl_top.cpp`](../tools/cl_top.cpp) |
-| Web dashboard | FastAPI backend + Next.js front end showing all Pis live | [`dashboard/`](../dashboard/README.md) |
+| Web dashboard | FastAPI backend + Next.js front end showing every node live | [`dashboard/`](../dashboard/README.md) |
 
 ## 1. Data flow
 
@@ -44,7 +44,7 @@ All fields are per node. "Cumulative" values count up from daemon start; the das
 |---|---|---|---|
 | Time | `timestampMs` | Node wall clock (Unix ms) | `system_clock` |
 | | `uptimeMs` | Daemon uptime | `steady_clock` |
-| **System memory** | `memTotalBytes`, `memAvailableBytes` | Whole Pi; used = total − available | `/proc/meminfo` |
+| **System memory** | `memTotalBytes`, `memAvailableBytes` | Whole board; used = total − available | `/proc/meminfo` |
 | **Process** | `rssBytes` | Resident memory of the daemon (arena pages actually touched + cache + code) | `/proc/self/status VmRSS` |
 | | `processThreads` | **OS threads** in the daemon (service, reader and compute threads) | `/proc/self/status Threads` |
 | **KUDA-Lite memory** | `arenaBytes` | Arena contributed to global memory | worker |
@@ -54,8 +54,9 @@ All fields are per node. "Cumulative" values count up from daemon start; the das
 | | `busyThreads` | Pool threads inside a kernel body at the sampling instant | `ThreadPool::busy()` |
 | **CPU** | `cpuPercent` | Whole-system utilisation over the last interval | `/proc/stat` deltas |
 | | `load1`, `cpuCores` | 1-minute load average, core count | `getloadavg`, `hardware_concurrency` |
-| | `cpuTempC` | SoC temperature, −1 if absent | `/sys/class/thermal/thermal_zone0/temp` |
-| | `cpuFreqMHz` | Current CPU clock (drops when throttling) | `/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq` |
+| | `cpuTempC` | **Hottest** SoC thermal zone, −1 if none. The Pi 5 has one zone; the CIX P1 has several (CPU clusters, GPU, NPU). | `/sys/class/thermal/thermal_zone*/temp` |
+| | `cpuFreqMHz` | Clock of the **fastest** CPU cluster (drops when throttling). On big.LITTLE parts `cpu0` is often a LITTLE core. | `/sys/devices/system/cpu/cpufreq/policy*/scaling_cur_freq` |
+| **Board** | `board` (v2) | Hardware model, e.g. `Raspberry Pi 5 Model B Rev 1.0`, `Orange Pi 6 Plus` | device-tree `model`, else DMI `sys_vendor` + `product_name` |
 | **Executor** | `executing`, `queueDepth`, `currentKernel` | Worker: running (0/1), waiting `ExecBlocks`, kernel name. Controller: `executing` = launches in progress. | worker executor |
 | | `execsCompleted`, `blocksExecuted`, `execBusyNs` | Cumulative work done and time spent executing | worker executor |
 | **Network** | `netRxBytes`, `netTxBytes` | All KUDA-Lite traffic of the daemon, headers included (cumulative) | `RpcPeer` counters |
@@ -70,7 +71,7 @@ The dashboard backend classifies each node, and the front end always shows the r
 
 | Signal | Normal | Warning | Critical | Why |
 |---|---|---|---|---|
-| SoC temperature | < 70 °C | ≥ 70 °C ("Warm") | ≥ 80 °C ("Hot") | The Pi 5 firmware starts throttling at 80–85 °C, visible as a falling `cpuFreqMHz` |
+| SoC temperature | < 70 °C | ≥ 70 °C ("Warm") | ≥ 80 °C ("Hot") | The Pi 5 firmware throttles at 80–85 °C (visible as a falling `cpuFreqMHz`). The Orange Pi 6 Plus stayed under 60 °C with its stock cooler in published tests, so the same levels flag a cooling problem early on either board. |
 | System memory used | < 80 % | ≥ 80 % | ≥ 90 % | Leave room for the page cache and the OS |
 | Node status | Online | Stale (no sample for > 5 s, or backend lost the controller) | Offline (disconnected) | |
 
@@ -99,13 +100,13 @@ u32 nodeCount, then per node (controller first, then workers by id):
   u32 n, n × sample blob (oldest first)
 ```
 
-### Sample blob (telemetry version 1)
+### Sample blob (telemetry version 2)
 
 A `u32` byte length followed by the body, so readers can skip fields that newer versions append:
 
 | Offset | Type | Field | | Offset | Type | Field |
 |---|---|---|---|---|---|---|
-| 0 | u16 | version (1) | | 94 | u32 | cpuCores |
+| 0 | u16 | version (2) | | 94 | u32 | cpuCores |
 | 2 | u64 | timestampMs | | 98 | f32 | cpuPercent |
 | 10 | u64 | uptimeMs | | 102 | f32 | load1 |
 | 18 | u64 | memTotalBytes | | 106 | f32 | cpuTempC |
@@ -118,9 +119,11 @@ A `u32` byte length followed by the body, so readers can skip fields that newer 
 | 70 | u64 | cacheHits | | 146 | u64 | netRxBytes |
 | 78 | u64 | cacheMisses | | 154 | u64 | netTxBytes |
 | 86 | u32 | computeThreads | | 162 | str | currentKernel |
-| 90 | u32 | busyThreads | | | | |
+| 90 | u32 | busyThreads | | *after currentKernel* | str | board (**v2**) |
 
-**Compatibility rule:** fields are only ever appended, and the version is bumped when they are. The C++ and Python decoders both ignore trailing bytes, and both have tests for that.
+Version 2 (KUDA-Lite 0.3) appended `board` after `currentKernel`.
+
+**Compatibility rule:** fields are only ever appended, and the version is bumped when they are. A 0.3 dashboard or host reads version-1 samples from 0.2 nodes (with an empty `board`), and older readers skip the new field. The C++ and Python decoders both ignore trailing bytes, and both have tests for that.
 
 ## 5. Host API
 

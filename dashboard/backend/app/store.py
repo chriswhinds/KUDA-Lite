@@ -183,6 +183,7 @@ class TelemetryStore:
         recent = list(state.samples)[-SPARK_POINTS:]
         return NodeView(
             **base,
+            board=s.board or None,
             timestamp_ms=s.timestamp_ms,
             uptime_ms=s.uptime_ms,
             mem_total_bytes=s.mem_total_bytes,

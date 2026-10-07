@@ -1,8 +1,8 @@
 # Copyright 2026 Christopher Hinds, Stratum Labs
 # SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
-# KUDA-Lite cluster inventory, read by deploy/deploy-cluster.sh.
-# Copy to deploy/cluster.inventory and edit.
+# KUDA-Lite cluster inventory (Raspberry Pi 5 example), read by deploy/deploy-cluster.sh.
+# Copy to deploy/cluster.inventory and edit. Orange Pi 6 Plus: see cluster.inventory.opi6plus.example.
 #
 # One line per node:   <role>  <ssh host>  [ssh user]
 #   role: controller (exactly one) | worker | dashboard

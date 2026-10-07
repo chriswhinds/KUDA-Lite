@@ -27,12 +27,13 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(KUDA-Lite
-  VERSION 0.2.0
-  DESCRIPTION "GPU-style compute runtime for a Raspberry Pi 5 cluster"
+  VERSION 0.3.0
+  DESCRIPTION "GPU-style compute runtime for ARM SBC clusters (Raspberry Pi 5, Orange Pi 6 Plus)"
   LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(CheckCXXCompilerFlag)
 
 option(KUDALITE_BUILD_CONTROLLER "Build cl-controller" ON)
 option(KUDALITE_BUILD_WORKER "Build cl-worker" ON)
@@ -41,8 +42,9 @@ option(KUDALITE_BUILD_TESTS "Build the test suite" ON)
 option(KUDALITE_BUILD_EXAMPLES "Build the examples" ON)
 option(KUDALITE_SHARED "Build libkudalite as a shared library" OFF)
 option(KUDALITE_WERROR "Treat compiler warnings as errors" OFF)
-set(KUDALITE_CPU "generic" CACHE STRING "CPU tuning: generic | native | pi5 (Cortex-A76)")
-set_property(CACHE KUDALITE_CPU PROPERTY STRINGS generic native pi5)
+set(KUDALITE_CPU "generic" CACHE STRING
+  "CPU tuning: generic | native | pi5 (Raspberry Pi 5, Cortex-A76) | opi6plus (Orange Pi 6 Plus, CIX P1 Cortex-A720/A520)")
+set_property(CACHE KUDALITE_CPU PROPERTY STRINGS generic native pi5 opi6plus)
 set(KUDALITE_SANITIZER "" CACHE STRING "Sanitizer for debugging: '' | thread | address")
 set_property(CACHE KUDALITE_SANITIZER PROPERTY STRINGS "" thread address)
 
@@ -66,14 +68,35 @@ target_compile_options(kudalite_flags INTERFACE
 
 if(KUDALITE_CPU STREQUAL "native")
   target_compile_options(kudalite_flags INTERFACE -mcpu=native)
-elseif(KUDALITE_CPU STREQUAL "pi5")
+elseif(KUDALITE_CPU MATCHES "^(pi5|opi6plus)$")
   if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
-    message(FATAL_ERROR "KUDALITE_CPU=pi5 needs an AArch64 target (building for ${CMAKE_SYSTEM_PROCESSOR}). "
-                        "Build on the Pi, or cross-compile with cmake/toolchains/aarch64-linux-gnu.cmake.")
+    message(FATAL_ERROR "KUDALITE_CPU=${KUDALITE_CPU} needs an AArch64 target (building for ${CMAKE_SYSTEM_PROCESSOR}). "
+                        "Build on the board, or cross-compile with cmake/toolchains/aarch64-linux-gnu.cmake.")
   endif()
-  target_compile_options(kudalite_flags INTERFACE -mcpu=cortex-a76)
+  if(KUDALITE_CPU STREQUAL "pi5")
+    set(_kudalite_cpu_candidates -mcpu=cortex-a76 -march=armv8.2-a)
+  else()
+    # CIX P1: 8 x Cortex-A720 + 4 x Cortex-A520, all Armv9.2-A. Tuning for the A720 is safe for the
+    # A520 too (same ISA). GCC < 14 does not know cortex-a720 (the Orange Pi Debian 12 image ships
+    # GCC 12), so fall back to its Armv9 sibling, then to the plain architecture.
+    set(_kudalite_cpu_candidates -mcpu=cortex-a720 -mcpu=cortex-a710 -march=armv9-a -march=armv8.2-a)
+  endif()
+  set(_kudalite_cpu_flag "")
+  foreach(_flag IN LISTS _kudalite_cpu_candidates)
+    string(MAKE_C_IDENTIFIER "KUDALITE_HAS${_flag}" _var)
+    check_cxx_compiler_flag(${_flag} ${_var})
+    if(${_var})
+      set(_kudalite_cpu_flag ${_flag})
+      break()
+    endif()
+  endforeach()
+  if(NOT _kudalite_cpu_flag)
+    message(FATAL_ERROR "the compiler accepts none of: ${_kudalite_cpu_candidates}")
+  endif()
+  message(STATUS "KUDA-Lite CPU tuning for ${KUDALITE_CPU}: ${_kudalite_cpu_flag}")
+  target_compile_options(kudalite_flags INTERFACE ${_kudalite_cpu_flag})
 elseif(NOT KUDALITE_CPU STREQUAL "generic")
-  message(FATAL_ERROR "KUDALITE_CPU must be generic, native or pi5 (got '${KUDALITE_CPU}')")
+  message(FATAL_ERROR "KUDALITE_CPU must be generic, native, pi5 or opi6plus (got '${KUDALITE_CPU}')")
 endif()
 
 if(KUDALITE_SANITIZER)

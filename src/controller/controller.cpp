@@ -426,7 +426,7 @@ void Controller::onHostMessage(const std::shared_ptr<Session>& s, const std::sha
         }
       }
       ByteWriter w;
-      w.putString("KUDA-Lite Raspberry Pi cluster");
+      w.putString("KUDA-Lite ARM SBC cluster");
       w.put<uint32_t>(count).put<uint32_t>(cores).put<uint64_t>(total).put<uint64_t>(total - used);
       w.put<uint32_t>(opts_.pageSize).put<uint32_t>(kProtocolVersion);
       peer->reply(m, clSuccess, w.take());

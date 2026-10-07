@@ -19,16 +19,21 @@
 # existing config files are never overwritten.
 #
 #   sudo deploy/install.sh controller
-#   sudo deploy/install.sh worker    --controller pi5-ctl
+#   sudo deploy/install.sh worker    --controller CONTROLLER_HOST
 #   sudo deploy/install.sh dashboard --controller 127.0.0.1 [--install-node]
 #   sudo deploy/install.sh host                       # library + tools only, no services
+#
+# Supported boards: Raspberry Pi 5 and Orange Pi 6 Plus are detected automatically and get their
+# own CPU tuning and network profile; any other 64-bit Linux machine gets a generic build.
 #
 # Options:
 #   --controller HOST   controller address (required for worker; dashboard default 127.0.0.1)
 #   --prefix DIR        install prefix for binaries/library (default /usr/local)
 #   --dashboard-dir DIR where the dashboard is installed (default /opt/kudalite/dashboard)
 #   --install-node      dashboard: download Node.js 22 LTS from nodejs.org if the system's is < 20.9
-#   --tune-network      also install deploy/sysctl/90-kudalite.conf
+#   --platform NAME     auto (default) | pi5 | opi6plus | generic: override board detection
+#   --tune-network      also install the board's network profile (deploy/sysctl/<platform>.conf)
+#                       as /etc/sysctl.d/90-kudalite.conf (recommended on the Orange Pi 6 Plus)
 #   --no-deps           do not install OS packages (you already have them)
 #   --no-start          install files only; do not touch systemd (e.g. building an SD-card image)
 #   --jobs N            parallel build jobs (default: number of CPUs)
@@ -48,6 +53,7 @@ tune_network=0
 with_deps=1
 start_services=1
 jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
+platform="auto"
 
 log() { printf '\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -66,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     --no-deps) with_deps=0 ;;
     --no-start) start_services=0 ;;
     --jobs) jobs="${2:?}"; shift ;;
+    --platform) platform="${2:?}"; shift ;;
     -h | --help) usage 0 ;;
     *) warn "unknown argument: $1"; usage 64 ;;
   esac
@@ -73,6 +80,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$role" ]] || usage 64
+case "$platform" in auto | pi5 | opi6plus | generic) ;; *) die "--platform must be auto, pi5, opi6plus or generic" ;; esac
 [[ "$(uname -s)" == Linux ]] || die "install.sh is for Linux nodes. On macOS build the host tools with: cmake --preset host && cmake --build --preset host"
 [[ $EUID -eq 0 ]] || die "run as root (sudo $0 ...)"
 if [[ "$role" == worker && -z "$controller" ]]; then die "worker needs --controller HOST"; fi
@@ -87,7 +95,29 @@ case "$arch" in
   *) warn "untested architecture '$arch'; KUDA-Lite targets 64-bit Linux (use a 64-bit OS on the Pi)" ;;
 esac
 
-is_pi5() { [[ -r /proc/device-tree/model ]] && tr -d '\0' </proc/device-tree/model | grep -q "Raspberry Pi 5"; }
+# ---- Board detection ----------------------------------------------------------------------------
+
+board_model() {  # device tree (most ARM boards) or DMI (UEFI/ACPI boards); "" if neither
+  if [[ -r /proc/device-tree/model ]]; then
+    tr -d '\0' </proc/device-tree/model
+  elif [[ -r /sys/class/dmi/id/product_name ]]; then
+    echo "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null) $(cat /sys/class/dmi/id/product_name)"
+  fi
+}
+
+detect_platform() {
+  local model
+  model="$(board_model)"
+  if [[ "$model" == *"Raspberry Pi 5"* ]]; then
+    echo pi5
+  elif [[ "$model" == *"Orange Pi 6"* ]] || grep -qiE '^CPU part[[:space:]]*:[[:space:]]*0xd81' /proc/cpuinfo 2>/dev/null; then
+    echo opi6plus  # Orange Pi 6 / 6 Plus, or any CIX P1 board (Cortex-A720 = part 0xd81)
+  else
+    echo generic
+  fi
+}
+
+if [[ "$platform" == auto ]]; then platform="$(detect_platform)"; fi
 
 # ---- OS packages --------------------------------------------------------------------------------
 
@@ -131,8 +161,7 @@ check_cmake() {
 
 build_and_install() {
   check_cmake
-  local cpu=generic controller_on=OFF worker_on=OFF
-  if is_pi5; then cpu=pi5; fi
+  local cpu="$platform" controller_on=OFF worker_on=OFF
   case "$role" in
     controller) controller_on=ON ;;
     worker) worker_on=ON ;;
@@ -304,11 +333,14 @@ install_dashboard() {
 
 # ---- Main ---------------------------------------------------------------------------------------
 
-log "KUDA-Lite install: role=$role source=$src prefix=$prefix"
+log "KUDA-Lite install: role=$role platform=$platform ($(board_model || true)) prefix=$prefix"
 if ((with_deps)); then install_packages; fi
 
 if [[ $tune_network == 1 ]]; then
-  install -m 0644 "$src/deploy/sysctl/90-kudalite.conf" /etc/sysctl.d/90-kudalite.conf
+  profile="$src/deploy/sysctl/$platform.conf"
+  [[ -f "$profile" ]] || profile="$src/deploy/sysctl/pi5.conf"  # generic machines: the 1 GbE profile
+  log "network profile: $(basename "$profile")"
+  install -m 0644 "$profile" /etc/sysctl.d/90-kudalite.conf
   sysctl -q -p /etc/sysctl.d/90-kudalite.conf || warn "could not apply sysctl settings now; they apply at next boot"
 fi
 

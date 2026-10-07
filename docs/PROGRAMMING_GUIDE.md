@@ -123,7 +123,7 @@ Memory errors throw `clKernelFault`, which the worker reports as the launch's er
 
 | CUDA | KUDA-Lite | Why |
 |---|---|---|
-| Per-thread kernels, `threadIdx`, `__syncthreads()` | Per-block kernels, `parallelFor` (implicit barrier) | A Pi has 4 big cores, not thousands of lanes |
+| Per-thread kernels, `threadIdx`, `__syncthreads()` | Per-block kernels, `parallelFor` (implicit barrier) | A board has 4 (Pi 5) or 12 (Orange Pi 6 Plus) CPU cores, not thousands of lanes |
 | `__shared__` | `ctx.scratch()` | |
 | Direct pointer dereference of global memory | `ctx.read*/write*` | Global memory lives across a network |
 | `void*` device pointers | `clDevPtr` (u64) | Prevents accidental host dereference |

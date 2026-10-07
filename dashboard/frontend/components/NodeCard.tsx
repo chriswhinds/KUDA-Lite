@@ -35,6 +35,7 @@ export function NodeCard({ node, selected, onSelect }: { node: NodeView; selecte
           <div className="node-sub">
             {worker ? `Worker ${node.id}` : "Controller"} · {node.address}
           </div>
+          {node.board && <div className="node-sub">{node.board}</div>}
         </div>
         <NodeStatusBadge status={node.status} />
       </div>

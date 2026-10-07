@@ -56,8 +56,8 @@ bool render(bool clear) {
               duration(cluster.controllerUptimeMs).c_str(), cluster.sessions, cluster.activeLaunches,
               (unsigned long long)cluster.launchesTotal, cluster.allocations, gib(cluster.allocatedBytes).c_str(),
               gib(cluster.arenaTotalBytes).c_str());
-  std::printf("%-5s %-11s %-18s %-8s %6s %6s %13s %7s %8s %11s %9s  %s\n", "ID", "ROLE", "HOST", "STATE", "CPU%",
-              "TEMP", "MEM GiB", "RSS", "ARENA", "THREADS", "BLOCKS", "KERNEL");
+  std::printf("%-5s %-11s %-18s %-18s %-8s %6s %6s %13s %7s %8s %11s %9s  %s\n", "ID", "ROLE", "HOST", "BOARD",
+              "STATE", "CPU%", "TEMP", "MEM GiB", "RSS", "ARENA", "THREADS", "BLOCKS", "KERNEL");
   for (const auto& n : nodes) {
     char id[16], mem[32], rss[16], arena[32], threads[32], temp[16], cpu[16];
     if (n.id == CL_CONTROLLER_NODE_ID) std::snprintf(id, sizeof id, "ctl");
@@ -75,8 +75,9 @@ bool render(bool clear) {
     if (n.cpuTempC >= 0) std::snprintf(temp, sizeof temp, "%.0fC", n.cpuTempC);
     else std::snprintf(temp, sizeof temp, "-");
     std::snprintf(cpu, sizeof cpu, "%.0f", n.cpuPercent);
-    std::printf("%-5s %-11s %-18.18s %-8s %6s %6s %13s %7s %8s %11s %9llu  %s\n", id,
-                n.role == clNodeController ? "controller" : "worker", n.hostname, state, cpu, temp, mem, rss, arena,
+    std::printf("%-5s %-11s %-18.18s %-18.18s %-8s %6s %6s %13s %7s %8s %11s %9llu  %s\n", id,
+                n.role == clNodeController ? "controller" : "worker", n.hostname, n.board[0] ? n.board : "-", state,
+                cpu, temp, mem, rss, arena,
                 threads, (unsigned long long)n.blocksExecuted, n.currentKernel[0] ? n.currentKernel : "-");
   }
   std::fflush(stdout);

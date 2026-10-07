@@ -120,6 +120,7 @@ struct clNodeTelemetry {
   uint64_t execsCompleted, blocksExecuted, execBusyNs;  // cumulative
   uint64_t netRxBytes, netTxBytes;                      // cumulative KUDA-Lite traffic
   char currentKernel[64];                               // "" when idle
+  char board[64];  // hardware model, e.g. "Orange Pi 6 Plus" ("" from nodes older than 0.3)
 };
 
 /// Cluster-wide counters kept by the controller.

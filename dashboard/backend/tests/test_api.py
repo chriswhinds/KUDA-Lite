@@ -75,6 +75,7 @@ def test_cluster_view(mock_controller):
         assert nodes[-1]["status"] == "offline"
         w0 = nodes[1]
         assert w0["status"] == "online"
+        assert w0["board"] == "Raspberry Pi 5 Model B Rev 1.0"
         assert w0["computeThreads"] == 4
         assert 0 <= w0["busyThreads"] <= 4
         assert w0["memTotalBytes"] == 8 << 30
@@ -109,3 +110,31 @@ def test_disconnected_state_is_reported():
         assert health["connected"] is False and health["error"]
         body = client.get("/api/cluster").json()
         assert body["connected"] is False and body["nodes"] == []
+
+
+def test_orange_pi_6_plus_cluster():
+    port = free_port()
+    ready = threading.Event()
+
+    def run() -> None:
+        async def main() -> None:
+            started = asyncio.Event()
+            task = asyncio.create_task(serve("127.0.0.1", port, MockCluster(4, 0, "mixed"), started))
+            await started.wait()
+            ready.set()
+            await task
+
+        asyncio.run(main())
+
+    threading.Thread(target=run, daemon=True).start()
+    assert ready.wait(5)
+    app = create_app(Settings(controller=f"127.0.0.1:{port}", poll_seconds=0.2))
+    with TestClient(app) as client:
+        wait_connected(client)
+        body = client.get("/api/cluster").json()
+        ctl, w0 = body["nodes"][0], body["nodes"][1]
+        assert ctl["board"].startswith("Raspberry Pi 5") and ctl["hostname"] == "pi5-ctl"
+        assert w0["board"] == "Orange Pi 6 Plus" and w0["hostname"] == "opi6-w0"
+        assert w0["computeThreads"] == 12 and w0["cpuCores"] == 12
+        assert w0["memTotalBytes"] == 64 << 30
+        assert body["summary"]["computeThreads"] == 48

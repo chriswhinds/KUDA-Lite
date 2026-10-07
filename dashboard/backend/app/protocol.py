@@ -31,7 +31,7 @@ PROTOCOL_VERSION = 1
 FLAG_RESPONSE = 1
 HEADER = struct.Struct("<IHHIiQQ")  # magic, version, type, flags, status, requestId, payloadLen
 MAX_PAYLOAD = 1 << 30
-TELEMETRY_VERSION = 1
+TELEMETRY_VERSION = 2  # v2 appended `board`
 CONTROLLER_NODE_ID = 0xFFFFFFFE
 NEVER_SEEN = 0xFFFFFFFFFFFFFFFF
 
@@ -206,6 +206,7 @@ class TelemetrySample:
     net_rx_bytes: int = 0
     net_tx_bytes: int = 0
     current_kernel: str = ""
+    board: str = ""  # v2: hardware model, e.g. "Orange Pi 6 Plus"
 
 
 def decode_sample(r: Reader) -> TelemetrySample:
@@ -241,6 +242,8 @@ def decode_sample(r: Reader) -> TelemetrySample:
         net_tx_bytes=body.u64(),
         current_kernel=body.string(),
     )
+    if version >= 2:
+        s.board = body.string()
     # Fields appended by newer telemetry versions are ignored.
     return s
 
@@ -275,6 +278,7 @@ def encode_sample(w: Writer, s: TelemetrySample) -> None:
         .u64(s.net_rx_bytes)
         .u64(s.net_tx_bytes)
         .string(s.current_kernel)
+        .string(s.board)
     )
     w.blob(body.bytes())
 

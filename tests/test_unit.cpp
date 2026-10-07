@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -261,6 +262,7 @@ TEST(telemetry_sample_roundtrip) {
   t.cpuTempC = 61.25f;
   t.netRxBytes = 12345;
   t.currentKernel = "cl_sgemm";
+  t.board = "Orange Pi 6 Plus";
   ByteWriter w;
   t.encode(w);
   w.put<uint32_t>(0xC0FFEE);  // whatever follows must still be readable
@@ -270,7 +272,7 @@ TEST(telemetry_sample_roundtrip) {
   CHECK(u.timestampMs == t.timestampMs && u.memTotalBytes == t.memTotalBytes);
   CHECK(u.memAvailableBytes == t.memAvailableBytes && u.processThreads == 11);
   CHECK(u.computeThreads == 4 && u.busyThreads == 3 && u.cpuPercent == 87.5f && u.cpuTempC == 61.25f);
-  CHECK(u.netRxBytes == 12345 && u.currentKernel == "cl_sgemm");
+  CHECK(u.netRxBytes == 12345 && u.currentKernel == "cl_sgemm" && u.board == "Orange Pi 6 Plus");
   CHECK(r.get<uint32_t>() == 0xC0FFEE);
 
   // A newer node may append fields: an old reader skips them because the sample is a blob.
@@ -287,6 +289,90 @@ TEST(telemetry_sample_roundtrip) {
   ByteReader r2(buf2);
   CHECK(TelemetrySample::decode(r2).currentKernel == "cl_sgemm");
   CHECK(r2.get<uint8_t>() == 7);
+}
+
+TEST(telemetry_reads_version_1_samples) {
+  // A 0.2.x node sends version 1: no board field. Build one by hand from a v2 encoding.
+  TelemetrySample t;
+  t.currentKernel = "k";
+  t.board = "";
+  ByteWriter w;
+  t.encode(w);
+  auto blob = w.take();
+  blob.resize(blob.size() - 4);  // drop the empty board string (u32 length 0)
+  const uint32_t len = static_cast<uint32_t>(blob.size() - 4);
+  std::memcpy(blob.data(), &len, 4);
+  const uint16_t v1 = 1;
+  std::memcpy(blob.data() + 4, &v1, 2);
+  ByteReader r(blob);
+  const TelemetrySample u = TelemetrySample::decode(r);
+  CHECK(u.currentKernel == "k" && u.board.empty() && r.remaining() == 0);
+}
+
+namespace {
+void writeFile(const std::string& path, const std::string& text) {
+  const std::string dir = path.substr(0, path.rfind('/'));
+  CHECK(std::system(("mkdir -p '" + dir + "'").c_str()) == 0);
+  std::ofstream(path, std::ios::binary) << text;
+}
+
+std::string fakeRoot(const char* name) {
+  const std::string root = "/tmp/kudalite-fake-" + std::string(name) + "-" + std::to_string(::getpid());
+  CHECK(std::system(("rm -rf '" + root + "'").c_str()) == 0);
+  writeFile(root + "/proc/meminfo", "MemTotal:       65536000 kB\nMemAvailable:   60000000 kB\n");
+  writeFile(root + "/proc/self/status", "Name:\tcl-worker\nThreads:\t17\nVmRSS:\t  102400 kB\n");
+  writeFile(root + "/proc/stat", "cpu  100 0 100 800 0 0 0 0 0 0\n");
+  return root;
+}
+}  // namespace
+
+TEST(system_sampler_orange_pi_6_plus_layout) {
+  // CIX P1: three cpufreq policies (A520 1.8 GHz, A720 2.4 GHz, A720 2.6 GHz) and several zones.
+  const std::string root = fakeRoot("cix");
+  writeFile(root + "/proc/device-tree/model", std::string("Orange Pi 6 Plus\0", 17));
+  writeFile(root + "/sys/class/thermal/thermal_zone0/temp", "45000\n");
+  writeFile(root + "/sys/class/thermal/thermal_zone1/temp", "61250\n");
+  writeFile(root + "/sys/class/thermal/thermal_zone2/temp", "38000\n");
+  writeFile(root + "/sys/class/thermal/thermal_zone3/temp", "999999\n");  // faulty sensor: ignored
+  writeFile(root + "/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq", "1800000\n");
+  writeFile(root + "/sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq", "2400000\n");
+  writeFile(root + "/sys/devices/system/cpu/cpufreq/policy8/scaling_cur_freq", "2600000\n");
+  SystemSampler sampler(root);
+  TelemetrySample s;
+  sampler.sample(&s);
+#ifdef __linux__
+  CHECK(s.board == "Orange Pi 6 Plus");
+  CHECK(s.cpuTempC == 61.25f);    // hottest valid zone, not zone0
+  CHECK(s.cpuFreqMHz == 2600);    // fastest cluster, not cpu0's LITTLE core
+  CHECK(s.memTotalBytes == 65536000ull * 1024 && s.processThreads == 17);
+#endif
+  CHECK(std::system(("rm -rf '" + root + "'").c_str()) == 0);
+}
+
+TEST(system_sampler_raspberry_pi_5_layout) {
+  const std::string root = fakeRoot("pi5");
+  writeFile(root + "/proc/device-tree/model", std::string("Raspberry Pi 5 Model B Rev 1.0\0", 31));
+  writeFile(root + "/sys/class/thermal/thermal_zone0/temp", "52300\n");
+  writeFile(root + "/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq", "2400000\n");
+  SystemSampler sampler(root);
+  TelemetrySample s;
+  sampler.sample(&s);
+#ifdef __linux__
+  CHECK(s.board == "Raspberry Pi 5 Model B Rev 1.0");
+  CHECK(s.cpuTempC > 52.29f && s.cpuTempC < 52.31f);
+  CHECK(s.cpuFreqMHz == 2400);
+#endif
+  CHECK(std::system(("rm -rf '" + root + "'").c_str()) == 0);
+}
+
+TEST(board_model_from_dmi) {
+  const std::string root = fakeRoot("dmi");  // UEFI/ACPI boards have no device tree
+  writeFile(root + "/sys/class/dmi/id/sys_vendor", "Orange Pi\n");
+  writeFile(root + "/sys/class/dmi/id/product_name", "Orange Pi 6 Plus\n");
+  CHECK(detectBoardModel(root) == "Orange Pi 6 Plus");  // vendor already in the product name
+  writeFile(root + "/sys/class/dmi/id/product_name", "6 Plus\n");
+  CHECK(detectBoardModel(root) == "Orange Pi 6 Plus");
+  CHECK(std::system(("rm -rf '" + root + "'").c_str()) == 0);
 }
 
 TEST(system_sampler_reads_this_machine) {

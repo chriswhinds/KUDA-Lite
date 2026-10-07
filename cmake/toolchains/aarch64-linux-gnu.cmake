@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Cross-compile KUDA-Lite for Raspberry Pi 5 (AArch64 Linux) from an x86-64 Linux machine.
+# Cross-compile KUDA-Lite for AArch64 boards (Raspberry Pi 5, Orange Pi 6 Plus) from an x86-64 Linux machine.
 #
 #   Debian/Ubuntu:  sudo apt install g++-aarch64-linux-gnu
-#   cmake --preset pi5-cross && cmake --build --preset pi5-cross
+#   cmake --preset pi5-cross      && cmake --build --preset pi5-cross
+#   cmake --preset opi6plus-cross && cmake --build --preset opi6plus-cross
 #
 # The binaries link against the cross toolchain's glibc and libstdc++, so the Pis must run a
 # distribution at least as new as the toolchain (or link statically: add

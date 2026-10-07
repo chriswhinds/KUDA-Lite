@@ -25,6 +25,7 @@ export function NodeTable({ nodes, selected, onSelect }: { nodes: NodeView[]; se
         <thead>
           <tr>
             <th scope="col">Node</th>
+            <th scope="col">Board</th>
             <th scope="col">Status</th>
             <th scope="col" className="num">CPU</th>
             <th scope="col" className="num">SoC temp</th>
@@ -47,6 +48,7 @@ export function NodeTable({ nodes, selected, onSelect }: { nodes: NodeView[]; se
                 </button>
                 <div className="muted small">{n.role === "worker" ? `Worker ${n.id}` : "Controller"}</div>
               </th>
+              <td>{n.board ?? <span className="muted">–</span>}</td>
               <td>
                 <NodeStatusBadge status={n.status} />
               </td>

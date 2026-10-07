@@ -56,6 +56,7 @@ class NodeView(ApiModel):
     role: Literal["worker", "controller"]
     hostname: str
     address: str
+    board: str | None = None  # hardware model reported by the node (KUDA-Lite >= 0.3)
     status: NodeStatus
     last_seen_age_ms: int | None
 

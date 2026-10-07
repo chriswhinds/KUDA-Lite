@@ -36,7 +36,7 @@ export function SummaryTiles({ s, tempLevel }: { s: ClusterSummary; tempLevel: L
   return (
     <section className="tiles" aria-label="Cluster summary">
       <Tile
-        label="Pis online"
+        label="Nodes online"
         value={`${s.nodesOnline} / ${s.nodesTotal}`}
         detail={offline > 0 ? `${offline} offline` : `controller up ${duration(s.controllerUptimeMs)}`}
       />
@@ -48,7 +48,7 @@ export function SummaryTiles({ s, tempLevel }: { s: ClusterSummary; tempLevel: L
       <Tile
         label="System memory in use"
         value={`${gib(s.memUsedBytes)} / ${gib(s.memTotalBytes)} GiB`}
-        detail="all Pis, including the OS"
+        detail="all nodes, including the OS"
       />
       <Tile
         label="Global memory allocated"

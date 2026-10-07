@@ -1,0 +1,19 @@
+# Copyright 2026 Christopher Hinds, Stratum Labs
+# SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
+
+# KUDA-Lite cluster inventory (Orange Pi 6 Plus example), read by deploy/deploy-cluster.sh.
+# Copy to deploy/cluster.inventory and edit.
+#
+# One line per node:   <role>  <ssh host>  [ssh user]
+#   role: controller (exactly one) | worker | dashboard
+# The board type is detected on each node by install.sh, so a mixed cluster (for example an
+# Orange Pi 6 Plus controller with Raspberry Pi 5 workers) needs nothing special here.
+# Orange Pi images create the user "orangepi"; use your own user if you created one.
+# Recommended install extras for this board: -x "--tune-network --install-node"
+
+controller  opi6-ctl  orangepi
+worker      opi6-w0   orangepi
+worker      opi6-w1   orangepi
+worker      opi6-w2   orangepi
+worker      opi6-w3   orangepi
+dashboard   opi6-ctl  orangepi
