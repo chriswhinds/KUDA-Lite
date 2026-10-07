@@ -30,7 +30,7 @@ namespace cl {
 
 /// Version of the sample encoding. New fields are only ever appended; readers ignore trailing
 /// bytes they do not understand, so older dashboards keep working against newer nodes.
-constexpr uint16_t kTelemetryVersion = 1;
+constexpr uint16_t kTelemetryVersion = 2;  // v2 appended `board`
 
 struct TelemetrySample {
   // Identity of the moment
@@ -76,6 +76,9 @@ struct TelemetrySample {
 
   std::string currentKernel;  // empty when idle
 
+  // --- version 2 ---
+  std::string board;  // hardware model, e.g. "Raspberry Pi 5 Model B Rev 1.0", "Orange Pi 6 Plus"
+
   /// Appends the sample as a length-prefixed blob.
   void encode(ByteWriter& w) const;
   /// Reads a blob written by encode() (any version >= 1).
@@ -84,16 +87,28 @@ struct TelemetrySample {
 
 /// Samples the OS-level fields (time, memory, process threads, CPU, temperature, frequency).
 /// KUDA-Lite-specific fields are filled in by the caller. Not thread-safe: keep one per thread.
+///
+/// Works across boards: the temperature is the hottest thermal zone (Pi 5 has one; the CIX P1
+/// on the Orange Pi 6 Plus has several) and the frequency is the fastest cpufreq policy (on
+/// big.LITTLE parts cpu0 is often a LITTLE core, which would under-report the clock).
 class SystemSampler {
  public:
-  SystemSampler();
+  /// `root` prefixes every /proc and /sys path (tests point it at a fake tree).
+  explicit SystemSampler(std::string root = "");
   void sample(TelemetrySample* out);
+  const std::string& board() const { return board_; }
 
  private:
+  std::string root_;
+  std::string board_;
   uint64_t startMs_;
   uint64_t prevBusy_ = 0;
   uint64_t prevTotal_ = 0;
 };
+
+/// Hardware model from the device tree (Raspberry Pi, most ARM boards) or DMI (UEFI/ACPI
+/// boards, x86). Empty if neither is available.
+std::string detectBoardModel(const std::string& root = "");
 
 /// Steady-clock milliseconds (for ages and intervals).
 uint64_t steadyMs();

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cl-worker: one Raspberry Pi worker node.
+// cl-worker: one worker node (Raspberry Pi 5, Orange Pi 6 Plus, or any 64-bit Linux machine).
 //
 // Responsibilities
 //  * Contributes an arena of RAM to cluster global memory and serves the data plane

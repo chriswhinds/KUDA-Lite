@@ -370,6 +370,7 @@ clError_t clGetTelemetry(clClusterTelemetry* cluster, clNodeTelemetry* nodes, ui
         t.netRxBytes = latest.netRxBytes;
         t.netTxBytes = latest.netTxBytes;
         copyName(t.currentKernel, sizeof t.currentKernel, latest.currentKernel);
+        copyName(t.board, sizeof t.board, latest.board);
       }
       if (i < capacity) nodes[i] = t;
     }

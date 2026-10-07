@@ -15,7 +15,7 @@
 
 # find_package(kudalite) for host applications:
 #
-#   find_package(kudalite 0.2 REQUIRED)
+#   find_package(kudalite 0.3 REQUIRED)
 #   target_link_libraries(my_app PRIVATE kudalite::kudalite)
 @PACKAGE_INIT@
 

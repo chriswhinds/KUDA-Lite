@@ -16,8 +16,9 @@
 // KUDA-Lite host runtime API (libkudalite).
 //
 // This library is the KUDA-Lite "kernel" on the host side: a Linux or macOS program links
-// against it to allocate cluster memory, move data and launch kernels on the Raspberry Pi
-// worker cluster. It plays the role a GPU vendor's runtime library plays. See docs/PROGRAMMING_GUIDE.md.
+// against it to allocate cluster memory, move data and launch kernels on the worker cluster
+// (Raspberry Pi 5 or Orange Pi 6 Plus boards). It plays the role a GPU vendor's runtime library
+// plays. See docs/PROGRAMMING_GUIDE.md.
 //
 // Conventions (mirroring common GPU runtime APIs):
 //  * Every call returns clError_t. Failures of asynchronous work are reported by the next
