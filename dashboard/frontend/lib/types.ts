@@ -24,6 +24,7 @@ export interface NodeView {
   role: "worker" | "controller";
   hostname: string;
   address: string;
+  board: string | null;
   status: NodeStatus;
   lastSeenAgeMs: number | null;
   timestampMs: number | null;

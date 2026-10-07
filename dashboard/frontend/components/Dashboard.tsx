@@ -111,7 +111,7 @@ export function Dashboard() {
 
           <div className="section-head">
             <h2>
-              Raspberry Pi nodes <span className="muted">· {nodes.length}</span>
+              Cluster nodes <span className="muted">· {nodes.length}</span>
             </h2>
             <div className="segmented" role="group" aria-label="Layout">
               {(["cards", "table"] as const).map((v) => (
@@ -124,7 +124,7 @@ export function Dashboard() {
           </div>
 
           {nodes.length === 0 ? (
-            <p className="muted">No nodes have reported yet. Start cl-worker on each Pi.</p>
+            <p className="muted">No nodes have reported yet. Start cl-worker on each board.</p>
           ) : view === "cards" ? (
             <div className="node-grid">
               {nodes.map((n) => (

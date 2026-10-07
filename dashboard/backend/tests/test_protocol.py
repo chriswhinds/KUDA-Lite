@@ -48,6 +48,7 @@ def sample(**kw) -> TelemetrySample:
         cpu_percent=87.5,
         cpu_temp_c=61.25,
         current_kernel="cl_sgemm",
+        board="Orange Pi 6 Plus",
     )
     base.update(kw)
     return TelemetrySample(**base)
@@ -72,6 +73,18 @@ def test_sample_roundtrip():
     w = Writer()
     encode_sample(w, s)
     assert decode_sample(Reader(w.bytes())) == s
+
+
+def test_version_1_sample_from_older_node():
+    w = Writer()
+    encode_sample(w, sample(board=""))
+    raw = bytearray(w.bytes())
+    del raw[-4:]  # drop the empty v2 board string
+    struct.pack_into("<I", raw, 0, len(raw) - 4)
+    struct.pack_into("<H", raw, 4, 1)  # version 1
+    r = Reader(bytes(raw))
+    s = decode_sample(r)
+    assert s.board == "" and s.current_kernel == "cl_sgemm" and r.remaining == 0
 
 
 def test_sample_ignores_fields_from_newer_versions():

@@ -18,7 +18,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "KUDA-Lite Cluster",
-  description: "Live telemetry for every Raspberry Pi 5 in a KUDA-Lite compute cluster",
+  description: "Live telemetry for every board (Raspberry Pi 5, Orange Pi 6 Plus) in a KUDA-Lite compute cluster",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

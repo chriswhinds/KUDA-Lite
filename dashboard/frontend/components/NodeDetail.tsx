@@ -67,7 +67,7 @@ export function NodeDetail({
       <div className={`chart-grid${refreshing ? " refreshing" : ""}`}>
         <TimeSeriesChart
           title="CPU utilisation"
-          subtitle="whole Pi, %"
+          subtitle="whole board, %"
           t={t}
           yMax={100}
           format={(v) => pct(v)}

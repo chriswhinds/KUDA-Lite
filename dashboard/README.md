@@ -5,15 +5,15 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 # KUDA-Lite Cluster Dashboard
 
-A small web service that shows live telemetry for every Raspberry Pi 5 in a KUDA-Lite cluster: memory, compute and OS threads, CPU, SoC temperature, the kernel each worker is running, and network traffic.
+A small web service that shows live telemetry for every board (Raspberry Pi 5, Orange Pi 6 Plus, or mixed) in a KUDA-Lite cluster, including each node's board model: memory, compute and OS threads, CPU, SoC temperature, the kernel each worker is running, and network traffic.
 
 ```
  browser ──HTTP──▶ Next.js front end ──/api/* proxy──▶ FastAPI backend ──KUDA-Lite protocol :7070──▶ cl-controller
- (React UI)         frontend/                           backend/          (GetTelemetry, every 1 s)     (history of all Pis)
+ (React UI)         frontend/                           backend/          (GetTelemetry, every 1 s)     (history of all nodes)
 ```
 
 - **Backend** (`backend/`, Python 3.10+, FastAPI). Keeps one session to the controller and speaks the KUDA-Lite binary protocol directly (no C++ bindings needed). It polls `GetTelemetry` every second, keeps 15 minutes of history per node in memory, computes rates (network, blocks/s) and health levels, and serves JSON. It reconnects automatically when the controller restarts.
-- **Front end** (`frontend/`, Next.js 16, React 19, TypeScript). One page: cluster summary tiles; a card per Pi with a CPU sparkline, memory and arena meters, busy compute-thread cells, OS thread count, temperature, executor state and network rates; a table view with every value; and 5 or 15 minutes of charts for the selected Pi (crosshair tooltip, keyboard navigable). Light and dark themes. No chart library: plain SVG.
+- **Front end** (`frontend/`, Next.js 16, React 19, TypeScript). One page: cluster summary tiles; a card per node with its board model, a CPU sparkline, memory and arena meters, busy compute-thread cells, OS thread count, temperature, executor state and network rates; a table view with every value; and 5 or 15 minutes of charts for the selected Pi (crosshair tooltip, keyboard navigable). Light and dark themes. No chart library: plain SVG.
 
 Background and field definitions: [docs/OBSERVABILITY.md](../docs/OBSERVABILITY.md).
 
@@ -45,10 +45,10 @@ cd dashboard/frontend && DASHBOARD_API_URL=http://127.0.0.1:8000 npm run dev
 
 Open `http://localhost:3000`. For production use `npm run build`, then `DASHBOARD_API_URL=… npm start`. The backend URL is read at runtime, so one build works anywhere.
 
-**No cluster yet?** Run the mock controller. It speaks the real protocol and simulates Pis alternating between idle and matmul launches, with one worker running hot:
+**No cluster yet?** Run the mock controller. It speaks the real protocol and simulates boards alternating between idle and matmul launches, with one worker running hot. `--platform` picks `pi5` (default), `opi6plus`, or `mixed` (a Pi 5 controller with Orange Pi 6 Plus workers):
 
 ```bash
-cd dashboard/backend && .venv/bin/python -m app.mock_controller --port 7070 --workers 6 --offline 1
+cd dashboard/backend && .venv/bin/python -m app.mock_controller --port 7070 --workers 6 --offline 1 --platform opi6plus
 ```
 
 ## Configuration

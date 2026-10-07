@@ -2,7 +2,7 @@
   "name": "kudalite-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Live telemetry dashboard for a KUDA-Lite Raspberry Pi 5 cluster",
+  "description": "Live telemetry dashboard for a KUDA-Lite ARM SBC cluster (Raspberry Pi 5, Orange Pi 6 Plus)",
   "license": "Apache-2.0",
   "author": "Christopher Hinds, Stratum Labs",
   "scripts": {

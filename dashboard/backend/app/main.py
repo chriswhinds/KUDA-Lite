@@ -95,7 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="KUDA-Lite Dashboard API",
         version="0.1.0",
-        summary="Live telemetry for every Raspberry Pi in a KUDA-Lite cluster.",
+        summary="Live telemetry for every board (Raspberry Pi 5, Orange Pi 6 Plus) in a KUDA-Lite cluster.",
         lifespan=lifespan,
     )
     app.state.store = store

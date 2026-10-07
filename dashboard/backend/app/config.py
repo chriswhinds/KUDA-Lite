@@ -36,7 +36,9 @@ class Settings:
     history_seconds: float = field(default_factory=lambda: _float("DASHBOARD_HISTORY_SECONDS", 900.0))
     # A node whose newest sample is older than this is shown as stale, seconds.
     stale_seconds: float = field(default_factory=lambda: _float("DASHBOARD_STALE_SECONDS", 5.0))
-    # Health thresholds. The Pi 5 firmware starts throttling the CPU around 80-85 C.
+    # Health thresholds. The Raspberry Pi 5 firmware starts throttling around 80-85 C; the Orange Pi
+    # 6 Plus stayed below 60 C under load with its stock cooler in published tests, so the same
+    # thresholds flag a cooling problem early on either board.
     temp_warning_c: float = field(default_factory=lambda: _float("DASHBOARD_TEMP_WARNING_C", 70.0))
     temp_critical_c: float = field(default_factory=lambda: _float("DASHBOARD_TEMP_CRITICAL_C", 80.0))
     mem_warning_pct: float = field(default_factory=lambda: _float("DASHBOARD_MEM_WARNING_PCT", 80.0))
