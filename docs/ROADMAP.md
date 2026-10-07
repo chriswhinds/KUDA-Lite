@@ -16,7 +16,7 @@ Release 0.3 adds the Orange Pi 6 Plus as a supported platform alongside the Rasp
    - the worker still owns global-memory access: it gathers tiles into NPU-visible buffers, runs the NPU job, and writes results back, so the memory model is unchanged;
    - telemetry gains NPU utilisation, and the dashboard shows it.
 
-   This depends on CIX's NPU SDK and runtime, whose licensing and Linux packaging need checking first. Until then all kernels run on the CPU.
+   This depends on CIX's NPU SDK and runtime, whose licensing and Linux packaging need checking first. Until then all kernels run on the CPU. Full decision record, design and phased plan: [NPU.md](NPU.md).
 3. **Thread placement on mixed cores:** optionally pin the kernel thread pool to the A720 clusters, and report per-cluster utilisation.
 4. **SVE2/NEON GEMM micro-kernel** tuned for the Cortex-A720 (and a NEON one for the Pi 5's A76).
 5. **Second 5 GbE port:** optional link aggregation, or a separate host-copy network.

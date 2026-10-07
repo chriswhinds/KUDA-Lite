@@ -113,6 +113,7 @@ docs/                      design documentation (below)
 | [Building](docs/BUILD.md) | CMake presets and options, tests, install layout, cross-compiling, using the library |
 | [Power: Raspberry Pi 5](docs/POWER.md) | Estimated power for a 5-Pi cluster + switch: idle, compute, peak, running cost, PSU/PoE/UPS advice |
 | [Power: Orange Pi 6 Plus](docs/POWER_OPI6PLUS.md) | The same for a 5-board Orange Pi 6 Plus cluster with a multi-gig switch, a mixed variant, and compute per watt |
+| [NPU inference](docs/NPU.md) | Why Orange Pi 6 Plus NPU inference was deferred, what is known about the NPU and its SDK, proposed design, decisions needed, and the plan for when boards arrive |
 | [Platforms](docs/PLATFORMS.md) | Raspberry Pi 5 vs Orange Pi 6 Plus: specs, what is platform-specific, mixed clusters, the NPU, adding a board |
 | [Deployment](docs/DEPLOYMENT.md) | Preparing the boards, deploying the whole cluster, configuration, operations, troubleshooting |
 | [Architecture](docs/ARCHITECTURE.md) | Components, threading, execution and stream model, sequence diagrams, failure model, design decisions |

@@ -96,7 +96,7 @@ Raspberry Pi OS Lite (64-bit) or Ubuntu Server. Use the official Active Cooler a
 
 ## 6. The NPU
 
-The CIX P1's NPU (up to 45 TOPS, INT8-oriented) is a reason to pick the Orange Pi 6 Plus, but **KUDA-Lite does not use it yet**: every kernel runs on the CPU cores. Using it needs CIX's NPU SDK and runtime, and a kernel back end that can hand suitable work (low-precision GEMM, convolutions) to the NPU while the CPU handles the rest. The design is outlined in the [roadmap](ROADMAP.md). The current CPU kernels and the whole runtime work unchanged in the meantime.
+The CIX P1's NPU (up to 45 TOPS, INT8-oriented) is a reason to pick the Orange Pi 6 Plus, but **KUDA-Lite does not use it yet**: every kernel runs on the CPU cores. Using it needs CIX's NPU SDK and runtime, and a kernel back end that can hand suitable work (low-precision GEMM, convolutions) to the NPU while the CPU handles the rest. The decision record, design and test plan are in [NPU.md](NPU.md), with a summary in the [roadmap](ROADMAP.md). The current CPU kernels and the whole runtime work unchanged in the meantime.
 
 ## 7. Adding another board
 
