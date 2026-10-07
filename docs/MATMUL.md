@@ -35,7 +35,7 @@ block = (T, T)                        tile width, tile height
 1. `read2D` the A row panel (`rows × K`) and the B column panel (`K × cols`) into scratch. Both reads are **cached**. If `β ≠ 0`, also read the C tile, **uncached** since it is used once.
 2. `parallelFor` over the tile's rows, so each core owns a contiguous band of rows:
    - `k` runs in panels of 128 (`kKBlock`), so a 128×T slice of B (64 KiB for T=128 floats) stays in the Cortex-A76's 512 KiB L2 while every row in the band streams over it;
-   - the inner loop `c[j] += a_ik · b_kj` is contiguous in `j`, so GCC vectorises it (NEON on the Pi, SSE/AVX on x86);
+   - the inner loop `c[j] += a_ik · b_kj` is contiguous in `j`, so GCC vectorises it (NEON on Arm boards, SSE/AVX on x86);
    - epilogue: `C = α·acc + β·C`. When β = 0, C is never read, which matches BLAS semantics (NaNs in C are ignored).
 3. `write2D` the tile back. Each row segment goes to the worker(s) that own it, in one batched message per owner.
 
@@ -57,19 +57,22 @@ Per launch, each of the W workers receives approximately:
 
 where `s` is the element size. B is replicated to every worker, which is the classic trade-off for 1-D distribution. It costs `K·N·s` of network per worker and makes all the compute local afterwards.
 
-The **cache budget** must hold B plus the A panels in flight. The default (15% of an 8 GB Pi, ≈1.2 GB) handles `float` B up to about 17k × 17k. If B does not fit, pages are evicted FIFO and refetched. That is still correct, just slower.
+The **cache budget** must hold B plus the A panels in flight. The default (15 % of RAM: ≈ 1.2 GB on an 8 GB Pi 5, ≈ 9.6 GB on a 64 GB Orange Pi 6 Plus) handles `float` B up to about 17k × 17k and 49k × 49k respectively. If B does not fit, pages are evicted FIFO and refetched. That is still correct, just slower.
 
-## 4. Performance model (Pi 5 cluster, 1 GbE)
+## 4. Performance model
 
-All figures are **estimates**, to be replaced with measurements in the hardware phase.
+All figures are **estimates**, to be replaced with measurements once the code runs on real hardware ([TESTING.md §4](TESTING.md#4-hardware-acceptance-plan)). Platform details are in [PLATFORMS.md](PLATFORMS.md).
 
-| Quantity | Value |
-|---|---|
-| Pi 5 peak FP32 (4 × A76 @ 2.4 GHz, 2×128-bit FMA) | ≈ 150 GFLOP/s |
-| This kernel (auto-vectorised, not hand-tuned), expected | ≈ 8–20 GFLOP/s per Pi |
-| Effective 1 GbE throughput | ≈ 110 MB/s per direction |
+| Quantity | Raspberry Pi 5 | Orange Pi 6 Plus |
+|---|---|---|
+| Cores | 4 × Cortex-A76 @ 2.4 GHz | 8 × Cortex-A720 @ 2.4–2.6 GHz + 4 × Cortex-A520 @ 1.8 GHz |
+| Peak FP32 (2 × 128-bit FMA per big core) | ≈ 150 GFLOP/s | ≈ 380 GFLOP/s (≈ 320 from the A720s) |
+| Measured Linpack (FP64, one board) | ≈ 27 GFLOP/s | ≈ 135 GFLOP/s (Orange Pi 6, same SoC) |
+| This kernel (auto-vectorised, not hand-tuned), expected | ≈ 8–20 GFLOP/s per board | ≈ 40–80 GFLOP/s per board |
+| Network per node | 1 GbE ≈ 110 MB/s per direction | 5 GbE ≈ 550 MB/s per direction |
+| Remote-page cache (default 15 % of RAM) | 1.2 GB (8 GB board) | 9.6 GB (64 GB board) |
 
-For square n×n `float` GEMM on W = 4 workers at ~10 GFLOP/s each:
+### 4.1 Raspberry Pi 5 cluster (4 workers at ~10 GFLOP/s each, 1 GbE)
 
 | n | FLOPs | Compute | B broadcast per worker | Host copies via controller (A, B in; C out) | Kernel time estimate |
 |---|---|---|---|---|---|
@@ -78,11 +81,25 @@ For square n×n `float` GEMM on W = 4 workers at ~10 GFLOP/s each:
 | 4096 | 137 G | ~3.4 s | 48 MB → ~0.45 s | 192 MB → ~1.8 s | ~4 s |
 | 8192 | 1.1 T | ~27 s | 192 MB → ~1.8 s | 768 MB → ~7 s | ~30 s |
 
-What this shows:
+### 4.2 Orange Pi 6 Plus cluster (4 workers at ~50 GFLOP/s each, 5 GbE)
 
-- Arithmetic intensity grows with n, so large problems are **compute-bound** and scale with the number of workers. Small problems (n ≲ 1024) are latency- and network-bound and won't beat a single laptop.
-- Host transfers through the controller are the other big cost. The roadmap's direct host→worker path and a 2.5 GbE HAT on the controller both address it.
-- Hand-written NEON micro-kernels (register-blocked 8×12) could reach 30–60 GFLOP/s per Pi, which would make the network matter more. The model above suggests the design stays compute-dominated at n ≥ 4096 even then.
+| n | FLOPs | Compute | B broadcast per worker | Host copies via controller | Kernel time estimate |
+|---|---|---|---|---|---|
+| 1024 | 2.1 G | ~11 ms | 3 MB → ~5 ms | 12 MB → ~22 ms | ~20 ms |
+| 2048 | 17 G | ~86 ms | 12 MB → ~22 ms | 48 MB → ~87 ms | ~0.11 s |
+| 4096 | 137 G | ~0.7 s | 48 MB → ~87 ms | 192 MB → ~0.35 s | ~0.8 s |
+| 8192 | 1.1 T | ~5.5 s | 192 MB → ~0.35 s | 768 MB → ~1.4 s | ~6 s |
+| 16384 | 8.8 T | ~44 s | 768 MB → ~1.4 s | 3.2 GB → ~6 s | ~46 s |
+
+The host-copy column assumes the host machine and the controller both have a ≥ 5 GbE link. With a 1 GbE host link (or a Raspberry Pi 5 controller in a mixed cluster), host copies take the 1 GbE times from §4.1.
+
+### 4.3 What this shows
+
+- Arithmetic intensity grows with n, so large problems are **compute-bound** and scale with the number of workers. Small problems (n ≲ 1024 on the Pi 5, n ≲ 2048 on the Orange Pi) are latency- and network-bound.
+- **The Orange Pi 6 Plus is about 5× faster per board and has 5× the network.** Compute and communication grow by similar factors, so the compute-to-communication balance is similar to the Pi 5's. Its much larger memory and cache (B up to ≈ 49k × 49k floats fits in one worker's cache) let it take problems the Pi cluster cannot hold.
+- **Host transfers through the controller** are the other big cost on both platforms. A direct host→worker data path is on the roadmap.
+- **Hand-written micro-kernels** could reach 30–60 GFLOP/s per Pi 5 (NEON) or 150+ GFLOP/s per Orange Pi (SVE2/NEON on the A720s), which would make the network matter more. On the Orange Pi, low-precision GEMM could also go to the NPU ([PLATFORMS.md §6](PLATFORMS.md#6-the-npu)).
+- **Mixed fast and slow cores:** `parallelFor` hands each worker thread small chunks of rows, so the A520 cores contribute without holding up the A720s ([PLATFORMS.md §3.1](PLATFORMS.md#31-heterogeneous-cores)).
 
 ## 5. Verification method
 
@@ -107,4 +124,4 @@ The test reports the worst ratio `error / bound` and passes if it is ≤ 1. Typi
 | Page size | `cl-controller --page-size` or `clMallocEx` | Larger pages mean fewer, bigger messages, but coarser caching |
 | Chunk factor | `cl-controller --chunk-factor` | More chunks balance better but cost more RPCs |
 | Cache size | `cl-worker --cache` | Must hold B for the one-fetch behaviour |
-| Threads | `cl-worker --threads` | Leave at 4 on a Pi 5 |
+| Threads | `cl-worker --threads` | Leave at all cores (4 on a Pi 5, 12 on an Orange Pi 6 Plus) |

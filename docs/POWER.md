@@ -5,6 +5,8 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 # Power Requirements: 5 × Raspberry Pi 5 Cluster
 
+*For the Orange Pi 6 Plus cluster, see [POWER_OPI6PLUS.md](POWER_OPI6PLUS.md).*
+
 Estimated electrical power for the reference KUDA-Lite cluster: **1 controller Pi 5, 4 worker Pi 5s, and one gigabit network switch.**
 
 > **These are estimates**, built from published measurements and manufacturer specifications (sources at the end), not from measurements of this cluster. Real figures depend on board revision, RAM size, workload, ambient temperature and accessories. Measure your own cluster before relying on the numbers for anything critical (§7).

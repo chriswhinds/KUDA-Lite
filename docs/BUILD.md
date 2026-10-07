@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 KUDA-Lite builds with CMake (≥ 3.21) and any C++17 compiler: GCC ≥ 9 or Clang ≥ 10 on Linux, and Apple Clang on macOS. It has no third-party C++ dependencies. The dashboard is built separately (see [§7](#7-dashboard)).
 
-To install on the Pis you normally don't run CMake yourself: `deploy/install.sh` does it for you ([DEPLOYMENT.md](DEPLOYMENT.md)). This page is for development, for host machines, and for anyone who wants control over the build.
+To install on the boards you normally don't run CMake yourself: `deploy/install.sh` does it for you ([DEPLOYMENT.md](DEPLOYMENT.md)). This page is for development, for host machines, and for anyone who wants control over the build.
 
 ## 1. Quick start
 
@@ -32,6 +32,8 @@ ctest --preset release
 | `release` | any machine | everything, optimised, for this CPU family |
 | `pi5` | a Raspberry Pi 5 | everything, tuned with `-mcpu=cortex-a76` |
 | `pi5-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Pi 5 binaries (daemons + tools, no tests) |
+| `opi6plus` | an Orange Pi 6 Plus | everything, tuned for the CIX P1: `-mcpu=cortex-a720`, falling back to `cortex-a710`, `armv9-a`, `armv8.2-a` as the compiler allows (Debian 12's GCC 12 gets `cortex-a710`) |
+| `opi6plus-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Orange Pi 6 Plus binaries (daemons + tools, no tests) |
 | `host` | macOS, or a Linux machine that only runs programs | `libkudalite` + `cl-info`, `cl-top`, `cl-test-*`, `saxpy` |
 | `debug` | development | debug build, warnings are errors |
 | `tsan` | development | ThreadSanitizer build; `ctest --preset tsan` runs the integration test under it |
@@ -50,7 +52,7 @@ Pass options as `-D<NAME>=<value>` when configuring.
 | `KUDALITE_BUILD_TESTS` | ON | `test_unit`, plus the CTest `unit` and `integration` tests |
 | `KUDALITE_BUILD_EXAMPLES` | ON | `saxpy` |
 | `KUDALITE_SHARED` | OFF | build `libkudalite` as a shared library |
-| `KUDALITE_CPU` | `generic` | `generic`, `native` (`-mcpu=native`), or `pi5` (`-mcpu=cortex-a76`; AArch64 only) |
+| `KUDALITE_CPU` | `generic` | `generic`, `native` (`-mcpu=native`), `pi5` (`-mcpu=cortex-a76`) or `opi6plus` (best of `-mcpu=cortex-a720` / `cortex-a710` / `-march=armv9-a` the compiler accepts). The last two are AArch64 only. See [PLATFORMS.md](PLATFORMS.md). |
 | `KUDALITE_SANITIZER` | *(empty)* | `thread` or `address` |
 | `KUDALITE_WERROR` | OFF | treat warnings as errors |
 | `CMAKE_BUILD_TYPE` | `Release` | `Release`, `RelWithDebInfo`, `Debug` |
@@ -98,7 +100,7 @@ share/doc/kudalite/                     this documentation
 ### Using KUDA-Lite from your own CMake project
 
 ```cmake
-find_package(kudalite 0.2 REQUIRED)
+find_package(kudalite 0.3 REQUIRED)
 target_link_libraries(my_app PRIVATE kudalite::kudalite)
 ```
 
@@ -112,9 +114,9 @@ scripts/package-release.sh
 
 This writes `dist/kudalite-<version>.tar.gz` and a `.sha256` file: the source tree without build output, `node_modules`, rendered configs or your inventory. It's for installing on nodes by hand ([DEPLOYMENT.md §6](DEPLOYMENT.md#6-manual-installation-one-node-at-a-time)). The tarball builds and tests on its own.
 
-## 6. Cross-compiling for the Pis
+## 6. Cross-compiling for the boards
 
-Building natively on each Pi (what `install.sh` does) is simplest, should take a few minutes on a Pi 5 (not yet timed on hardware), and always matches the Pi's libraries. To build once on a fast x86-64 Linux machine instead:
+Building natively on each board (what `install.sh` does) is simplest, should take a few minutes (not yet timed on hardware), and always matches the board's libraries. To build once on a fast x86-64 Linux machine instead:
 
 ```bash
 sudo apt install g++-aarch64-linux-gnu
@@ -124,7 +126,11 @@ sudo apt install g++-aarch64-linux-gnu
 cmake --preset pi5-cross && cmake --build --preset pi5-cross
 ```
 
-The binaries in `build/pi5-cross/` need a glibc and libstdc++ on the Pi at least as new as the cross toolchain's. Build on a distribution no newer than the Pis', add `-DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"`, or point `PI_SYSROOT` at a sysroot copied from a Pi. Copy `cl-controller` / `cl-worker` to `/usr/local/bin` on the nodes and install the config and units as in [DEPLOYMENT.md §6](DEPLOYMENT.md#6-manual-installation-one-node-at-a-time).
+```bash
+cmake --preset opi6plus-cross && cmake --build --preset opi6plus-cross
+```
+
+The binaries in `build/pi5-cross/` need a glibc and libstdc++ on the board at least as new as the cross toolchain's. Build on a distribution no newer than the boards' (Orange Pi's image is Debian 12), add `-DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"`, or point `PI_SYSROOT` at a sysroot copied from a Pi. Copy `cl-controller` / `cl-worker` to `/usr/local/bin` on the nodes and install the config and units as in [DEPLOYMENT.md §6](DEPLOYMENT.md#6-manual-installation-one-node-at-a-time).
 
 ## 7. Dashboard
 

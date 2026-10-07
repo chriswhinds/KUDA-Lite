@@ -9,9 +9,9 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 **Goals**
 
-- Present a cluster of Raspberry Pi 5 boards to a Linux or macOS program as **one device**, with a programming model close enough to NVIDIA CUDA that CUDA programmers feel at home: device memory, host↔device copies, kernels over a grid of blocks, streams, and events.
+- Present a cluster of ARM single-board computers (**Raspberry Pi 5** or **Orange Pi 6 Plus**; see [Platforms](PLATFORMS.md)) to a Linux or macOS program as **one device**, with a programming model close enough to NVIDIA CUDA that CUDA programmers feel at home: device memory, host↔device copies, kernels over a grid of blocks, streams, and events.
 - Pool the RAM of all workers into **one global address space** that any kernel on any worker can read and write.
-- Keep each worker to **one operation at a time**, with the controller Pi doing all coordination.
+- Keep each worker to **one operation at a time**, with the controller board doing all coordination.
 - Be simple and portable: C++17, POSIX, no third-party dependencies, any Linux distribution.
 - Make matrix multiplication (test case 1) correct and reasonably efficient.
 
@@ -27,8 +27,8 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 | KUDA-Lite term | Meaning | NVIDIA CUDA analogue |
 |---|---|---|
 | **Host runtime** (`libkudalite`) | Library linked into the application on the Linux/macOS machine. The requirements call this "the kernel". | `libcudart` |
-| **Controller** (`cl-controller`) | Daemon on the controller Pi. Owns scheduling, memory management and membership. | GPU driver + front end + block scheduler |
-| **Worker** (`cl-worker`) | Daemon on each worker Pi. Stores part of global memory and runs blocks. | Streaming multiprocessor (SM) |
+| **Controller** (`cl-controller`) | Daemon on the controller board. Owns scheduling, memory management and membership. | GPU driver + front end + block scheduler |
+| **Worker** (`cl-worker`) | Daemon on each worker board. Stores part of global memory and runs blocks. | Streaming multiprocessor (SM) |
 | **Global memory** | Union of all worker arenas, addressed by 64-bit `clDevPtr` | Device global memory |
 | **Kernel** | Named function compiled into the worker, run once per block | `__global__` function |
 | **Block** | Unit of scheduling. Runs on one worker, which uses all its cores. | Thread block |
@@ -42,10 +42,10 @@ flowchart LR
   subgraph Host["Linux / macOS host"]
     App["Application"] --> RT["libkudalite<br/>(host runtime)"]
   end
-  subgraph Ctl["Controller Pi 5"]
+  subgraph Ctl["Controller (Pi 5 or Orange Pi 6 Plus)"]
     C["cl-controller<br/>sessions · streams · memory manager<br/>block scheduler · DSM client"]
   end
-  subgraph Workers["Worker Pi 5s"]
+  subgraph Workers["Workers (Pi 5 or Orange Pi 6 Plus)"]
     W0["cl-worker 0<br/>arena · executor · page cache"]
     W1["cl-worker 1"]
     Wn["cl-worker N"]
@@ -104,7 +104,7 @@ Source: [`src/worker/worker.cpp`](../src/worker/worker.cpp)
 | Data-plane server | Serves `MemReadV`/`MemWriteV`/`MemFillV` for its arena to the controller and to peers. Handlers are bounds-checked memcpys that run on the connection's reader thread. |
 | Control handler | Applies cluster-map and allocation-table updates, and queues `ExecBlocks` requests. |
 | Executor | **One thread, one operation at a time.** It pops an `ExecBlocks` request, runs each block through the kernel function, and replies with status and elapsed time. |
-| Thread pool | `clBlockContext::parallelFor` spreads a block's work over all cores (4 on a Pi 5). |
+| Thread pool | `clBlockContext::parallelFor` spreads a block's work over all cores: 4 on a Pi 5, 12 on an Orange Pi 6 Plus (mixed A720/A520 cores, balanced by dynamic chunking). |
 | DSM client + page cache | Lets kernels reach any global address. Remote pages can be cached for the duration of one launch (§ [Memory Model](MEMORY_MODEL.md#6-caching)). |
 | Kernel registry | Kernels register themselves by name at static-initialisation time (`CL_KERNEL`). The list is reported to the controller on registration. |
 | Telemetry | A thread samples memory, threads, CPU, temperature and executor state, and pushes it to the controller every second. |
@@ -117,7 +117,7 @@ A launch names a kernel and gives `grid` and `block` dimensions (`clDim3`, as in
 
 ### 5.2 Block kernels (the main deviation from CUDA)
 
-A GPU runs thousands of lightweight threads per SM. A Pi 5 has four big cores. Emulating per-thread CUDA semantics (including `__syncthreads`) on a CPU would need fibers or compiler transforms, and would waste most of the core on scheduling overhead. So in KUDA-Lite:
+A GPU runs thousands of lightweight threads per SM. A Pi 5 has 4 big cores and an Orange Pi 6 Plus has 12. Emulating per-thread CUDA semantics (including `__syncthreads`) on a CPU would need fibers or compiler transforms, and would waste most of the core on scheduling overhead. So in KUDA-Lite:
 
 - a kernel is a **function of one block**: `void kernel(clBlockContext& ctx, clArgReader& args)`;
 - inside it, `ctx.parallelFor(n, body)` plays the role of the block's threads: it splits `[0, n)` over all cores and returns when all are done, which is an implicit barrier, the analogue of `__syncthreads()`;
@@ -254,7 +254,7 @@ Host programs find the controller through `clInit("host:port")` or `$KUDALITE_CO
 | Failure | Effect | Detection and handling |
 |---|---|---|
 | Host process exits or crashes | Session ends | Controller cancels running launches, drops queued ops, frees the session's allocations |
-| Worker process or Pi dies | **Its slice of every allocation is lost** | Control connection drops. The worker is marked dead and removed from the cluster map. Chunks running on it fail with `clErrorWorkerLost`. Later accesses to pages it owned fail with `clErrorWorkerLost`/`clErrorNetwork`. New allocations and launches use the surviving workers only. |
+| Worker process or board dies | **Its slice of every allocation is lost** | Control connection drops. The worker is marked dead and removed from the cluster map. Chunks running on it fail with `clErrorWorkerLost`. Later accesses to pages it owned fail with `clErrorWorkerLost`/`clErrorNetwork`. New allocations and launches use the surviving workers only. |
 | Controller dies | Whole cluster state is lost | Hosts get `clErrorNetwork`. Workers exit and are restarted by their supervisor. |
 | Kernel throws or reads out of bounds | Launch fails | Worker returns `clErrorLaunchFailure` / `clErrorInvalidDevicePointer`. The controller stops scheduling the launch, and the error surfaces at the next synchronisation. |
 | Malformed message | Request rejected | `clErrorProtocol` reply. A corrupt frame header closes the connection. |
@@ -265,7 +265,7 @@ Replication and checkpointing of global memory are on the [roadmap](ROADMAP.md).
 
 The v1 protocol has **no authentication and no encryption**. Anyone who can reach the ports can allocate, read and write cluster memory and launch any *compiled-in* kernel. Mitigations for v1:
 
-- Put the Pis on an isolated switch or VLAN, and bind the controller's host port to the interface the host machine uses.
+- Put the boards on an isolated switch or VLAN, and bind the controller's host port to the interface the host machine uses.
 - Workers never receive code, only kernel *names*, so a network attacker cannot run arbitrary code through KUDA-Lite.
 
 Every message is bounds-checked (frame size limit, extent bounds against the arena, truncated-payload detection). TLS with mutual authentication is on the roadmap.
@@ -279,6 +279,6 @@ Every message is bounds-checked (frame size limit, extent bounds against the are
 | Page striping (64 KiB default) | Contiguous per-worker blocks only | Striping spreads bandwidth for *any* access pattern and needs no layout knowledge. `clDistBlocked` is available when locality matters. |
 | Translation is a pure function of a small record | Distributed page tables | Each allocation needs one `AllocAdd` broadcast. Every node can then translate addresses without further lookups. |
 | Controller proxies host copies | Host writes to workers directly | One connection for the host, simple ordering semantics, and the host needs no view of the cluster. The cost is that host transfers pass through the controller's NIC (a direct path is on the roadmap). |
-| Dynamic chunk self-scheduling | Static partitioning | Pis throttle when hot and networks vary. Dynamic scheduling absorbs both and costs one RPC per chunk. |
+| Dynamic chunk self-scheduling | Static partitioning | Boards throttle when hot, clusters may mix board types and core speeds, and networks vary. Dynamic scheduling absorbs both and costs one RPC per chunk. |
 | TCP with a custom binary framing | gRPC, MPI, ZeroMQ | No dependencies (so any distribution works), full control of batching and zero-extra-copy paths, and a small auditable surface. |
 | Release consistency at kernel boundaries | Coherent caches | Same guarantee as CUDA global memory between blocks. The cache needs no invalidation traffic. |
