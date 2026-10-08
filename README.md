@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 Christopher Hinds, Stratum Labs
+Copyright 2026 Christopher Hinds, Stratum Labs llc
 SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 -->
 
@@ -162,7 +162,7 @@ Code, documentation, the build system (CMake), configuration (`/etc/kudalite/*.c
 
 ## License
 
-Copyright 2026 Christopher Hinds, Stratum Labs.
+Copyright 2026 Christopher Hinds, Stratum Labs llc.
 
 KUDA-Lite is licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution and trademark notices. Every source file carries the standard Apache 2.0 header with `SPDX-License-Identifier: Apache-2.0`.
 

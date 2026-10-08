@@ -1,4 +1,4 @@
-// Copyright 2026 Christopher Hinds, Stratum Labs
+// Copyright 2026 Christopher Hinds, Stratum Labs llc
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
