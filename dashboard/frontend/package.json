@@ -4,7 +4,7 @@
   "private": true,
   "description": "Live telemetry dashboard for a KUDA-Lite ARM SBC cluster (Raspberry Pi 5, Orange Pi 6 Plus)",
   "license": "Apache-2.0",
-  "author": "Christopher Hinds, Stratum Labs",
+  "author": "Christopher Hinds, Stratum Labs llc",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

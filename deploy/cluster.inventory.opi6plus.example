@@ -1,4 +1,4 @@
-# Copyright 2026 Christopher Hinds, Stratum Labs
+# Copyright 2026 Christopher Hinds, Stratum Labs llc
 # SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 
 # KUDA-Lite cluster inventory (Orange Pi 6 Plus example), read by deploy/deploy-cluster.sh.
