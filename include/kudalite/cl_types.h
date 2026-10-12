@@ -40,6 +40,7 @@ typedef enum clError {
   clErrorWorkerLost = 10,            // a worker left the cluster while work depended on it
   clErrorProtocol = 11,              // malformed or unexpected message
   clErrorNoWorkers = 12,             // cluster has no live workers
+  clErrorNotSupported = 13,          // feature not built in, or not available on this OS/kernel
   clErrorUnknown = 999
 } clError_t;
 
@@ -132,6 +133,24 @@ struct clClusterTelemetry {
   uint32_t allocations;
   uint64_t allocatedBytes;  // sum of live allocation sizes
   uint64_t arenaTotalBytes; // sum of live worker arenas
+};
+
+/// Unified memory view (optional feature, KUDALITE_UNIFIED_MEMORY). See docs/UNIFIED_MEMORY.md.
+typedef struct clUnifiedView_st* clUnifiedView_t;
+
+struct clUnifiedInfo {
+  void* base;              // start of the continuous window in this process
+  clDevPtr devPtr;         // the same memory as a device pointer (for kernels and clMemcpy*)
+  size_t bytes;            // window size: spans every worker's arena, back to back
+  size_t chunkBytes;       // transfer granularity (fetch and write-back unit)
+  uint32_t workers;        // workers the window spans
+  uint32_t writeTracking;  // 1: only modified chunks are written back; 0: all resident chunks are
+  uint64_t residentBytes;  // currently present in this process
+  uint64_t dirtyBytes;     // modified since the last sync (when writeTracking)
+  uint64_t faults;         // chunks fetched on first touch
+  uint64_t writeFaults;    // first writes to clean chunks
+  uint64_t bytesFetched;   // from the workers
+  uint64_t bytesWrittenBack;  // to the workers
 };
 
 typedef struct clStream_st* clStream_t;

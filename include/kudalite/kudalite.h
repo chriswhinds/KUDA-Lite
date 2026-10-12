@@ -96,6 +96,31 @@ clError_t clMemcpyDtoDAsync(clDevPtr dst, clDevPtr src, size_t bytes, clStream_t
 clError_t clMemsetAsync(clDevPtr dst, int value, size_t bytes, clStream_t stream);
 
 // ---------------------------------------------------------------------------------------------
+// Unified memory view (optional; build with -DKUDALITE_UNIFIED_MEMORY=ON, Linux only)
+//
+// Maps cluster global memory spanning every worker's RAM into this process as ONE continuous
+// address range that ordinary pointers can read and write. Pages are fetched from the owning
+// workers on first touch and written back by clUnifiedSync. Consistency is release/acquire:
+// call clUnifiedSync after writing (before kernels or other processes read the data) and
+// clUnifiedInvalidate before reading data that kernels or other processes wrote. Without the
+// build option every function returns clErrorNotSupported. See docs/UNIFIED_MEMORY.md.
+// ---------------------------------------------------------------------------------------------
+
+/// Opens a view of `bytes` (0 = as much free cluster memory as possible), striped one
+/// contiguous block per worker. `chunkBytes` is the transfer unit (0 = 256 KiB; must be a
+/// multiple of the system page size).
+clError_t clUnifiedOpen(clUnifiedView_t* view, size_t bytes, size_t chunkBytes);
+clError_t clUnifiedGetInfo(clUnifiedView_t view, clUnifiedInfo* info);
+/// Writes modified chunks back to the workers (release). Returns the first fetch/write error.
+clError_t clUnifiedSync(clUnifiedView_t view);
+/// Syncs, then drops every local copy so the next access re-fetches (acquire).
+clError_t clUnifiedInvalidate(clUnifiedView_t view);
+/// Fetches a range now, e.g. before passing the memory to a system call such as write().
+clError_t clUnifiedPrefetch(clUnifiedView_t view, size_t offset, size_t bytes);
+/// Syncs, unmaps the window and frees the cluster memory.
+clError_t clUnifiedClose(clUnifiedView_t view);
+
+// ---------------------------------------------------------------------------------------------
 // Streams — ordered work queues. Work in different streams may run concurrently.
 // ---------------------------------------------------------------------------------------------
 

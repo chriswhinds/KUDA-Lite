@@ -16,6 +16,16 @@
       }
     },
     {
+      "name": "unified",
+      "displayName": "Release with the unified memory view",
+      "description": "Release build plus KUDALITE_UNIFIED_MEMORY (Linux). Combine with a board preset by adding -DKUDALITE_UNIFIED_MEMORY=ON.",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/unified",
+      "cacheVariables": {
+        "KUDALITE_UNIFIED_MEMORY": "ON"
+      }
+    },
+    {
       "name": "pi5",
       "displayName": "Raspberry Pi 5 (native)",
       "description": "Run on a Raspberry Pi 5: tuned for Cortex-A76.",
@@ -85,7 +95,8 @@
       "binaryDir": "${sourceDir}/build/tsan",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "KUDALITE_SANITIZER": "thread"
+        "KUDALITE_SANITIZER": "thread",
+        "KUDALITE_UNIFIED_MEMORY": "ON"
       }
     }
   ],
@@ -93,6 +104,10 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "unified",
+      "configurePreset": "unified"
     },
     {
       "name": "pi5",
@@ -127,6 +142,13 @@
     {
       "name": "release",
       "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "unified",
+      "configurePreset": "unified",
       "output": {
         "outputOnFailure": true
       }

@@ -38,6 +38,7 @@
 #include "common/protocol.h"
 #include "common/rpc.h"
 #include "common/telemetry.h"
+#include "host/unified_internal.h"
 #include "kudalite/kudalite.h"
 
 using cl::ByteReader;
@@ -433,6 +434,7 @@ clError_t clMemcpyDtoHAsync(void* dst, clDevPtr src, size_t bytes, clStream_t st
   if (bytes == 0) return clSuccess;
   if (dst == nullptr) return record(clErrorInvalidValue);
   CL_RUNTIME(rt);
+  kudalite::detail::unifiedPrepareHostWrite(dst, bytes);  // see unified_internal.h
   auto s = rt->stream(stream);
   auto* p = static_cast<uint8_t*>(dst);
   for (uint64_t off = 0; off < bytes; off += kCopyChunk) {
