@@ -34,9 +34,10 @@ ctest --preset release
 | `pi5-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Pi 5 binaries (daemons + tools, no tests) |
 | `opi6plus` | an Orange Pi 6 Plus | everything, tuned for the CIX P1: `-mcpu=cortex-a720`, falling back to `cortex-a710`, `armv9-a`, `armv8.2-a` as the compiler allows (Debian 12's GCC 12 gets `cortex-a710`) |
 | `opi6plus-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Orange Pi 6 Plus binaries (daemons + tools, no tests) |
+| `unified` | any Linux machine | `release` plus the optional unified memory view (`KUDALITE_UNIFIED_MEMORY=ON`) and `cl-test-unified` |
 | `host` | macOS, or a Linux machine that only runs programs | `libkudalite` + `cl-info`, `cl-top`, `cl-test-*`, `saxpy` |
 | `debug` | development | debug build, warnings are errors |
-| `tsan` | development | ThreadSanitizer build; `ctest --preset tsan` runs the integration test under it |
+| `tsan` | development | ThreadSanitizer build, with the unified memory view; `ctest --preset tsan` runs the integration test under it |
 
 Build trees go to `build/<preset>/`.
 
@@ -52,6 +53,7 @@ Pass options as `-D<NAME>=<value>` when configuring.
 | `KUDALITE_BUILD_TESTS` | ON | `test_unit`, plus the CTest `unit` and `integration` tests |
 | `KUDALITE_BUILD_EXAMPLES` | ON | `saxpy` |
 | `KUDALITE_SHARED` | OFF | build `libkudalite` as a shared library |
+| `KUDALITE_UNIFIED_MEMORY` | OFF | the unified memory view ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)); Linux only, needs kernel headers. When OFF, `clUnified*` return `clErrorNotSupported`. |
 | `KUDALITE_CPU` | `generic` | `generic`, `native` (`-mcpu=native`), `pi5` (`-mcpu=cortex-a76`) or `opi6plus` (best of `-mcpu=cortex-a720` / `cortex-a710` / `-march=armv9-a` the compiler accepts). The last two are AArch64 only. See [PLATFORMS.md](PLATFORMS.md). |
 | `KUDALITE_SANITIZER` | *(empty)* | `thread` or `address` |
 | `KUDALITE_WERROR` | OFF | treat warnings as errors |
@@ -66,6 +68,8 @@ Pass options as `-D<NAME>=<value>` when configuring.
 | `cl-controller`, `cl-worker` | `bin/` | the daemons |
 | `cl-info`, `cl-top` | `bin/` | cluster query, live telemetry |
 | `cl-test-memory`, `cl-test-matmul` | `bin/` | cluster acceptance tests (`tests/test_memory.cpp`, `tests/test_matmul.cpp`) |
+| `cl-test-unified` | `bin/` (with `KUDALITE_UNIFIED_MEMORY`) | unified memory view acceptance test; also run by the integration test |
+| `unified_memory` | source in `share/kudalite/examples/` | unified memory example (built with the option) |
 | `saxpy` | source only, in `share/kudalite/examples/` | example program |
 | `test_unit` | not installed | unit tests |
 
@@ -100,11 +104,11 @@ share/doc/kudalite/                     this documentation
 ### Using KUDA-Lite from your own CMake project
 
 ```cmake
-find_package(kudalite 0.3 REQUIRED)
+find_package(kudalite 0.4 REQUIRED)
 target_link_libraries(my_app PRIVATE kudalite::kudalite)
 ```
 
-If KUDA-Lite is installed somewhere other than a default prefix, configure with `-DCMAKE_PREFIX_PATH=<prefix>`. Without CMake, compile with `-I<prefix>/include` and link `<prefix>/lib/libkudalite.a -pthread`.
+The package sets `KUDALITE_UNIFIED_MEMORY` to tell you whether the installed library includes the unified memory view. If KUDA-Lite is installed somewhere other than a default prefix, configure with `-DCMAKE_PREFIX_PATH=<prefix>`. Without CMake, compile with `-I<prefix>/include` and link `<prefix>/lib/libkudalite.a -pthread`.
 
 ### Release tarball
 

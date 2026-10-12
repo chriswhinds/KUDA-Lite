@@ -12,6 +12,7 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 | `tests/test_unit.cpp` | no | Serialisation (round trips, truncation), free-list allocation and coalescing, allocation page math, address translation (mid-page, cross-page, out of range, unmapped), extent coalescing, kernel-argument packing, `ExecBlocks`/cluster-map encoding, host:port and size parsing, thread pool (coverage, nesting, exception propagation) |
 | `tests/test_memory.cpp` | yes | Striped (64 KiB and 4 KiB pages, odd sizes) and blocked round trips, unaligned cross-worker sub-ranges, memset, device-to-device copy, two streams ordered by an event, event timing, error reporting (out-of-range, unmapped, unknown kernel, double free, bad page size) |
 | `tests/test_matmul.cpp` | yes | Test case 1: SGEMM/DGEMM against a reference with a formal error bound ([MATMUL.md §5](MATMUL.md#5-verification-method)) |
+| `tests/test_unified.cpp` (`cl-test-unified`, only with `KUDALITE_UNIFIED_MEMORY=ON`) | yes | Unified memory view ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)): a slice on every worker, pointer writes then sync, write-back of modified chunks only, invalidate, a kernel on the same memory, concurrent faulting threads, system calls on prefetched memory, device-to-host copies into the window (no deadlock), close releases memory, the largest possible window. Skips (exit 0) when the build or kernel does not support it |
 | `examples/saxpy.cpp` | yes | Smallest end-to-end program, using `cl_saxpy` |
 | `tools/cl_info.cpp` | yes | Cluster query; smoke test for connectivity |
 | `tools/cl_top.cpp` | yes | Live telemetry of every node; smoke test for the telemetry path |
@@ -118,6 +119,26 @@ After the rename, everything was rebuilt and re-run from clean:
 
 **Not yet verified:** any run on real Orange Pi 6 Plus or Raspberry Pi 5 hardware, real 1 GbE / 5 GbE networking, the NPU (not used yet), macOS host at runtime, long-duration soak.
 
+### Unified memory view (release 0.4, optional feature)
+
+Run on Linux 7.0 x86-64 with a local 3-worker cluster (256 MiB arenas), `vm.unprivileged_userfaultfd=0`.
+
+| Check | Result |
+|---|---|
+| `cmake --preset unified` + build with `-Werror` | Clean |
+| `cl-test-unified`: 48 MiB window, 256 KiB chunks, 3 workers, write tracking on | PASS (all sections) |
+| Largest window (`bytes = 0`) | 729 MiB of 768 MiB cluster memory as one contiguous range; first and last byte reach the first and last worker |
+| Write tracking: two bytes changed in different chunks, then `clUnifiedSync` | Exactly 2 chunks (512 KiB) written back |
+| Deadlock check: the host-write hook disabled on purpose | Test hangs (killed at 40 s), proving the hook is what prevents it; with the hook: PASS |
+| `ctest --preset unified` (unit + integration, which runs `cl-test-unified`) | 2/2 PASS |
+| `ctest --preset tsan` (ThreadSanitizer, feature on) | 2/2 PASS, no ThreadSanitizer reports |
+| `release` preset (feature off): `ctest`; `clUnifiedOpen` stub | 2/2 PASS; returns `clErrorNotSupported` ("not supported by this build or system") |
+| `examples/unified_memory` | Prints `y[0] = 4.0` |
+| Sandbox `install.sh host --unified-memory` | Builds and installs `cl-test-unified`; installed `kudaliteConfig.cmake` sets `KUDALITE_UNIFIED_MEMORY ON` |
+| `write()` from a chunk never touched | `EFAULT`, as documented; `clUnifiedPrefetch` first fixes it |
+
+**Not yet verified:** the unified view on real Pi 5 / Orange Pi 6 Plus clusters and kernels (Raspberry Pi OS, Orange Pi Debian), page-fault throughput over real 1 GbE / 5 GbE, macOS (not supported: returns `clErrorNotSupported`).
+
 ## 4. Hardware acceptance plan
 
 To run on each platform: Raspberry Pi 5 (`pi5`) and Orange Pi 6 Plus (`opi6plus`). Record results per platform. The cluster programs are installed on every node as `cl-test-memory` and `cl-test-matmul`.
@@ -144,3 +165,11 @@ Orange Pi 6 Plus additions:
 | O5 | `threads = 12` vs `threads = 8` in `worker.conf`, n = 8192 | Record both; 12 should not be slower (confirms the A520 cores help rather than hurt) |
 | O6 | Mixed cluster: Raspberry Pi 5 controller + Orange Pi 6 Plus workers | H3–H4 pass; dashboard shows both board models |
 | O7 | Power: wall meter at idle and during H6 | Within ±25 % of [POWER_OPI6PLUS.md](POWER_OPI6PLUS.md), or update the document |
+
+Unified memory view (build with `--unified-memory`; on either platform):
+
+| # | Test | Pass criterion |
+|---|---|---|
+| U1 | `cl-test-unified` from the host | PASS; write tracking reported "on" (kernel ≥ 5.7) |
+| U2 | `examples/unified_memory` with every worker idle | Window ≥ 80 % of the summed arenas; prints `y[0] = 4.0` |
+| U3 | Sequential read of a 1 GiB window after `clUnifiedInvalidate` | Record MB/s; compare with the estimates in [UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance) (≈ 110 MB/s on 1 GbE, ≈ 550 MB/s on 5 GbE) |

@@ -37,6 +37,7 @@ Release 0.3 adds the Orange Pi 6 Plus as a supported platform alongside the Rasp
 | CPU only; the Orange Pi 6 Plus NPU is unused | Accelerator capacity left idle | NPU back end (above) |
 | Default stream does not synchronise with other streams | Differs from CUDA's legacy stream | Optional legacy mode |
 | Single host per allocation (no sharing between processes) | No multi-process pipelines | IPC handles (`clIpcGetMemHandle` analogue) |
+| Unified memory view moves data over the network on first touch | Random fine-grained access is slow ([UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance)) | A faster interconnect as a data-plane transport, e.g. PCIe NTB or FPGA if hardware becomes available. GPIO was evaluated and rejected ([UNIFIED_MEMORY.md §7](UNIFIED_MEMORY.md#7-why-not-gpio)). |
 | Dashboard and telemetry are unauthenticated | Anyone on the network can view cluster state | Put the dashboard behind the site's SSO / reverse proxy; token on `GetTelemetry` |
 | Telemetry lives in memory only (15 min in the dashboard) | No long-term trends | Prometheus `/metrics` endpoint on the backend (and Grafana), or a small time-series store |
 | Throttling is inferred from frequency and temperature | Undervoltage and throttle history are not shown | Read firmware throttle flags where available (`vcgencmd get_throttled` on the Pi 5; the CIX P1's equivalent once documented) |

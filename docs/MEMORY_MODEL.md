@@ -109,3 +109,8 @@ Use `clCache::Uncached` for data that is read exactly once (streaming inputs, `C
 5. Wait for every reply. The first error wins.
 
 So a `read2D` of 128 rows spread over 4 workers costs **one round trip** (4 concurrent messages), not 128.
+
+## 8. Unified memory view (optional)
+
+Built with `KUDALITE_UNIFIED_MEMORY`, a host process can map one **blocked** allocation, one contiguous slice per worker laid back to back, as a continuous range of ordinary memory. Chunks are fetched on first touch through `userfaultfd` and written back on `clUnifiedSync`. The view adds no new consistency rules: `clUnifiedSync` is a release (like finishing a copy to the device), and `clUnifiedInvalidate` is an acquire (like copying back from it). See [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
+

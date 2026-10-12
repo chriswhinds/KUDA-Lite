@@ -20,6 +20,7 @@ Header: [`include/kudalite/kudalite.h`](../include/kudalite/kudalite.h). Every c
 | Events | `clEventCreate/Destroy/Record/Synchronize/Query/ElapsedTime` | `cudaEvent*` |
 | Launch | `clLaunchKernel(name, grid, block, args, bytes, stream)`, `clLaunch(name, grid, block, stream, args...)` | `cudaLaunchKernel`, `<<< >>>` |
 | Sync | `clDeviceSynchronize()`, `clGetLastLaunchInfo(stream, &info)` | `cudaDeviceSynchronize` |
+| Unified memory (optional build) | `clUnifiedOpen/GetInfo/Sync/Invalidate/Prefetch/Close` ([Unified memory](UNIFIED_MEMORY.md)) | `cudaMallocManaged` (similar idea, different consistency rules) |
 | BLAS | `clblasSgemm`, `clblasDgemm`, `clblasSaxpy` ([`clblas.h`](../include/kudalite/clblas.h)) | cuBLAS |
 
 ### Connecting
@@ -119,7 +120,28 @@ Memory errors throw `clKernelFault`, which the worker reports as the launch's er
 2. Put parameter structs in a header shared with the host program.
 3. Rebuild and redeploy `cl-worker` on every worker. At registration the controller logs how many kernels each worker reported.
 
-## 3. Differences from NVIDIA CUDA
+## 3. Unified memory view (optional)
+
+When the library is built with `-DKUDALITE_UNIFIED_MEMORY=ON` (Linux), a program can map cluster memory spanning every worker as one continuous range:
+
+```cpp
+clUnifiedView_t view;
+clUnifiedOpen(&view, 1ull << 30, 0);           // 1 GiB, spread over all workers
+clUnifiedInfo info;
+clUnifiedGetInfo(view, &info);
+float* a = static_cast<float*>(info.base);
+for (size_t i = 0; i < n; ++i) a[i] = f(i);    // first touch of each chunk fetches it
+clUnifiedSync(view);                            // release: kernels may now read it
+clLaunch("my_kernel", grid, block, nullptr, info.devPtr, n);
+clStreamSynchronize(nullptr);
+clUnifiedInvalidate(view);                      // acquire: see the kernel's writes
+use(a[0]);
+clUnifiedClose(view);
+```
+
+Rules: sync after writing through the pointer, and invalidate before reading what others wrote. Prefetch before passing window memory to system calls. Without the build option the functions return `clErrorNotSupported`. Full details: [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
+
+## 4. Differences from NVIDIA CUDA
 
 | CUDA | KUDA-Lite | Why |
 |---|---|---|
