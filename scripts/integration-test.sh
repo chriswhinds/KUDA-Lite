@@ -44,6 +44,9 @@ step() { echo; echo "=== $* ==="; }
 step "cl-info";        "$bin/cl-info" "$KUDALITE_CONTROLLER"
 step "cl-test-memory"; "$bin/cl-test-memory" --controller "$KUDALITE_CONTROLLER"
 step "cl-test-matmul"; "$bin/cl-test-matmul" --controller "$KUDALITE_CONTROLLER" --sizes 64,257x129x300,512
+if [[ -x "$bin/cl-test-unified" ]]; then
+  step "cl-test-unified"; "$bin/cl-test-unified" --controller "$KUDALITE_CONTROLLER"
+fi
 if [[ -x "$bin/saxpy" ]]; then
   step "saxpy";        "$bin/saxpy"
 fi
