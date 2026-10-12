@@ -32,6 +32,8 @@
 #   --dashboard-dir DIR where the dashboard is installed (default /opt/kudalite/dashboard)
 #   --install-node      dashboard: download Node.js 22 LTS from nodejs.org if the system's is < 20.9
 #   --platform NAME     auto (default) | pi5 | opi6plus | generic: override board detection
+#   --unified-memory    build the optional unified memory view (clUnified*, cl-test-unified):
+#                       programs on this machine can map all workers' RAM as one continuous range
 #   --tune-network      also install the board's network profile (deploy/sysctl/<platform>.conf)
 #                       as /etc/sysctl.d/90-kudalite.conf (recommended on the Orange Pi 6 Plus)
 #   --no-deps           do not install OS packages (you already have them)
@@ -54,6 +56,7 @@ with_deps=1
 start_services=1
 jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
 platform="auto"
+unified_memory=OFF
 
 log() { printf '\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -73,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --no-start) start_services=0 ;;
     --jobs) jobs="${2:?}"; shift ;;
     --platform) platform="${2:?}"; shift ;;
+    --unified-memory) unified_memory=ON ;;
     -h | --help) usage 0 ;;
     *) warn "unknown argument: $1"; usage 64 ;;
   esac
@@ -167,7 +171,7 @@ build_and_install() {
     worker) worker_on=ON ;;
   esac
   local build="/var/tmp/kudalite-build-$role"
-  log "building KUDA-Lite ($role, CPU tuning: $cpu) in $build"
+  log "building KUDA-Lite ($role, CPU tuning: $cpu, unified memory: $unified_memory) in $build"
   cmake -S "$src" -B "$build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$prefix" \
@@ -176,7 +180,8 @@ build_and_install() {
     -DKUDALITE_BUILD_WORKER="$worker_on" \
     -DKUDALITE_BUILD_TOOLS=ON \
     -DKUDALITE_BUILD_TESTS=ON \
-    -DKUDALITE_BUILD_EXAMPLES=OFF >/dev/null
+    -DKUDALITE_BUILD_EXAMPLES=OFF \
+    -DKUDALITE_UNIFIED_MEMORY="$unified_memory" >/dev/null
   cmake --build "$build" --parallel "$jobs"
   log "running unit tests"
   ctest --test-dir "$build" -L unit --output-on-failure
