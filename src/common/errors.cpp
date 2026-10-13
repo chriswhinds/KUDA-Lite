@@ -30,6 +30,7 @@ const char* clGetErrorString(clError_t err) {
     case clErrorWorkerLost: return "a worker left the cluster";
     case clErrorProtocol: return "protocol error";
     case clErrorNoWorkers: return "no workers available";
+    case clErrorNotSupported: return "not supported by this build or system";
     case clErrorUnknown: return "unknown error";
   }
   return "unrecognised error code";

@@ -80,6 +80,7 @@ Source: [`src/host/runtime.cpp`](../src/host/runtime.cpp), [`src/host/clblas.cpp
 - Tracks, for each stream, an **in-flight counter** and a **sticky error**. Every stream operation is sent as a request tagged with its stream id. The controller answers when the operation has *completed*, and the answer decrements the counter. Synchronising a stream means waiting for its counter to reach zero, then reporting and clearing the first error.
 - Splits large copies into **8 MiB requests**. These pipeline through the controller, and device-to-host chunks are written straight into the caller's buffer as they arrive.
 - Events keep the controller timestamp from their completion reply, so `clEventElapsedTime` measures on a single clock (the controller's).
+- **Optional unified memory view** (`KUDALITE_UNIFIED_MEMORY`, Linux): maps an allocation spanning every worker as one continuous range of ordinary memory. A `userfaultfd` handler thread fetches chunks on first touch and tracks writes; `clUnifiedSync` writes them back. It is built entirely on the public runtime API ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)).
 
 ### 4.2 Controller (`cl-controller`)
 

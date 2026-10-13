@@ -12,7 +12,7 @@ A host program allocates "device" memory, copies data in, launches kernels on st
 - the **host runtime** (`libkudalite`, the KUDA-Lite "kernel" on the Linux/macOS machine) sends each stream of work to the cluster;
 - one board, the **controller**, manages the cluster: it schedules work, manages memory and tracks membership;
 - the other boards, the **workers**, run the kernels. Each worker runs one operation at a time, using all of its cores;
-- the RAM of all workers is pooled into a **single global address space** that every worker can read and write.
+- the RAM of all workers is pooled into a **single global address space** that every worker can read and write. An optional **unified memory view** maps it into a host program as one continuous range of ordinary pointers ([Unified memory](docs/UNIFIED_MEMORY.md)).
 
 ```
  Linux / macOS host                 Controller board                 Worker boards
@@ -103,6 +103,7 @@ tools/cl_info.cpp          cl-info: cluster "deviceQuery"
 tools/cl_top.cpp           cl-top: live per-node telemetry in the terminal
 dashboard/                 web dashboard: FastAPI backend + Next.js front end
 examples/saxpy.cpp         smallest complete program
+examples/unified_memory.cpp  the whole cluster's RAM as one array (unified memory view)
 docs/                      design documentation (below)
 ```
 
@@ -113,6 +114,7 @@ docs/                      design documentation (below)
 | [Building](docs/BUILD.md) | CMake presets and options, tests, install layout, cross-compiling, using the library |
 | [Power: Raspberry Pi 5](docs/POWER.md) | Estimated power for a 5-Pi cluster + switch: idle, compute, peak, running cost, PSU/PoE/UPS advice |
 | [Power: Orange Pi 6 Plus](docs/POWER_OPI6PLUS.md) | The same for a 5-board Orange Pi 6 Plus cluster with a multi-gig switch, a mixed variant, and compute per watt |
+| [Unified memory](docs/UNIFIED_MEMORY.md) | Optional: all workers' RAM as one continuous pointer range on the host (userfaultfd, no driver): API, consistency, performance, limits, and why GPIO was not used |
 | [NPU inference](docs/NPU.md) | Why Orange Pi 6 Plus NPU inference was deferred, what is known about the NPU and its SDK, proposed design, decisions needed, and the plan for when boards arrive |
 | [Platforms](docs/PLATFORMS.md) | Raspberry Pi 5 vs Orange Pi 6 Plus: specs, what is platform-specific, mixed clusters, the NPU, adding a board |
 | [Deployment](docs/DEPLOYMENT.md) | Preparing the boards, deploying the whole cluster, configuration, operations, troubleshooting |
@@ -125,6 +127,10 @@ docs/                      design documentation (below)
 | [Dashboard](dashboard/README.md) | Running and configuring the web dashboard |
 | [Testing](docs/TESTING.md) | Test plan, how to run a simulated cluster, verification results |
 | [Roadmap](docs/ROADMAP.md) | Known limitations and planned work |
+
+## Unified memory view (optional)
+
+Build with `-DKUDALITE_UNIFIED_MEMORY=ON` (or `install.sh --unified-memory`), and a program on the controller or any Linux host can map **every worker's RAM as one continuous address range**. Pointers read and write it directly; chunks are fetched from their workers on first touch and written back on `clUnifiedSync`. It is off by default and needs no kernel driver or root. See [Unified memory](docs/UNIFIED_MEMORY.md).
 
 ## Observability
 

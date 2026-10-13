@@ -243,6 +243,7 @@ deploy/deploy-cluster.sh -x "--tune-network --install-node" install
 | `--tune-network` | Installs the board's network profile as `/etc/sysctl.d/90-kudalite.conf`: `deploy/sysctl/pi5.conf` (bigger TCP buffers for 1–2.5 GbE) or `deploy/sysctl/opi6plus.conf` (64 MB windows and a larger backlog for 5 GbE) |
 | `--install-node` | For the dashboard: if the system Node.js is older than 20.9 (Raspberry Pi OS and Orange Pi's Debian 12 ship 18), downloads Node.js 22 LTS from nodejs.org into `/opt/kudalite/node` and verifies its checksum |
 | `--platform NAME` | Overrides board detection: `pi5`, `opi6plus` or `generic` (normally not needed) |
+| `--unified-memory` | Builds the optional unified memory view into the library and tools on that node, including `cl-test-unified` ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)). Use it on the controller, or on whichever machine runs your programs. |
 
 Expect a few minutes per board, most of it the compile. The dashboard's first build (npm) adds a few more. These are estimates; they have not been timed on real hardware yet.
 
@@ -291,13 +292,13 @@ scripts/package-release.sh
 ```
 
 ```bash
-scp dist/kudalite-0.3.0.tar.gz dist/kudalite-0.3.0.tar.gz.sha256 pi@pi5-w0:
+scp dist/kudalite-0.4.0.tar.gz dist/kudalite-0.4.0.tar.gz.sha256 pi@pi5-w0:
 ```
 
 On the node:
 
 ```bash
-sha256sum -c kudalite-0.3.0.tar.gz.sha256 && tar xzf kudalite-0.3.0.tar.gz && cd kudalite-0.3.0
+sha256sum -c kudalite-0.4.0.tar.gz.sha256 && tar xzf kudalite-0.4.0.tar.gz && cd kudalite-0.4.0
 ```
 
 Then run the command for the node's role:

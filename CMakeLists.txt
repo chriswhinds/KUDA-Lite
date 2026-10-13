@@ -27,7 +27,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(KUDA-Lite
-  VERSION 0.3.0
+  VERSION 0.4.0
   DESCRIPTION "GPU-style compute runtime for ARM SBC clusters (Raspberry Pi 5, Orange Pi 6 Plus)"
   LANGUAGES CXX)
 
@@ -42,6 +42,8 @@ option(KUDALITE_BUILD_TESTS "Build the test suite" ON)
 option(KUDALITE_BUILD_EXAMPLES "Build the examples" ON)
 option(KUDALITE_SHARED "Build libkudalite as a shared library" OFF)
 option(KUDALITE_WERROR "Treat compiler warnings as errors" OFF)
+option(KUDALITE_UNIFIED_MEMORY
+  "Unified memory view: map all workers' RAM into one continuous address range on the host (Linux, userfaultfd)" OFF)
 set(KUDALITE_CPU "generic" CACHE STRING
   "CPU tuning: generic | native | pi5 (Raspberry Pi 5, Cortex-A76) | opi6plus (Orange Pi 6 Plus, CIX P1 Cortex-A720/A520)")
 set_property(CACHE KUDALITE_CPU PROPERTY STRINGS generic native pi5 opi6plus)
@@ -58,6 +60,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 find_package(Threads REQUIRED)
+
+if(KUDALITE_UNIFIED_MEMORY)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "KUDALITE_UNIFIED_MEMORY needs Linux (userfaultfd); building for ${CMAKE_SYSTEM_NAME}")
+  endif()
+  include(CheckIncludeFileCXX)
+  check_include_file_cxx(linux/userfaultfd.h KUDALITE_HAVE_USERFAULTFD_H)
+  if(NOT KUDALITE_HAVE_USERFAULTFD_H)
+    message(FATAL_ERROR "KUDALITE_UNIFIED_MEMORY needs <linux/userfaultfd.h> (install the Linux kernel headers)")
+  endif()
+endif()
 
 # ---- Shared compile settings ------------------------------------------------------------------
 
@@ -135,6 +148,7 @@ endif()
 add_library(kudalite ${_kudalite_kind}
   src/host/runtime.cpp
   src/host/clblas.cpp
+  src/host/unified.cpp
   $<TARGET_OBJECTS:kudalite_common>)
 add_library(kudalite::kudalite ALIAS kudalite)
 target_include_directories(kudalite PUBLIC
@@ -142,6 +156,8 @@ target_include_directories(kudalite PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(kudalite PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(kudalite PUBLIC Threads::Threads PRIVATE $<BUILD_INTERFACE:kudalite_flags>)
+# Without the option the clUnified* API is still present and returns clErrorNotSupported.
+target_compile_definitions(kudalite PRIVATE KUDALITE_UNIFIED_MEMORY=$<BOOL:${KUDALITE_UNIFIED_MEMORY}>)
 set_target_properties(kudalite PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 
 install(TARGETS kudalite EXPORT kudaliteTargets
@@ -194,12 +210,21 @@ if(KUDALITE_BUILD_TOOLS)
     target_link_libraries(${t} PRIVATE kudalite kudalite_flags)
   endforeach()
   install(TARGETS cl-info cl-top cl-test-memory cl-test-matmul RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  if(KUDALITE_UNIFIED_MEMORY)
+    add_executable(cl-test-unified tests/test_unified.cpp)
+    target_link_libraries(cl-test-unified PRIVATE kudalite kudalite_flags)
+    install(TARGETS cl-test-unified RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 if(KUDALITE_BUILD_EXAMPLES)
   add_executable(saxpy examples/saxpy.cpp)
   target_link_libraries(saxpy PRIVATE kudalite kudalite_flags)
-  install(FILES examples/saxpy.cpp DESTINATION ${CMAKE_INSTALL_DATADIR}/kudalite/examples)
+  install(FILES examples/saxpy.cpp examples/unified_memory.cpp DESTINATION ${CMAKE_INSTALL_DATADIR}/kudalite/examples)
+  if(KUDALITE_UNIFIED_MEMORY)
+    add_executable(unified_memory examples/unified_memory.cpp)
+    target_link_libraries(unified_memory PRIVATE kudalite kudalite_flags)
+  endif()
 endif()
 
 # ---- Deployment files (config templates + systemd units, with this prefix baked in) ----------
@@ -237,4 +262,4 @@ endif()
 
 message(STATUS "KUDA-Lite ${PROJECT_VERSION}: ${CMAKE_BUILD_TYPE}, CPU tuning '${KUDALITE_CPU}', "
                "controller=${KUDALITE_BUILD_CONTROLLER} worker=${KUDALITE_BUILD_WORKER} "
-               "tools=${KUDALITE_BUILD_TOOLS} tests=${KUDALITE_BUILD_TESTS}")
+               "tools=${KUDALITE_BUILD_TOOLS} tests=${KUDALITE_BUILD_TESTS} unified-memory=${KUDALITE_UNIFIED_MEMORY}")
