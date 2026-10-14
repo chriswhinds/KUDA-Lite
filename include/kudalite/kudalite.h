@@ -117,6 +117,12 @@ clError_t clUnifiedSync(clUnifiedView_t view);
 clError_t clUnifiedInvalidate(clUnifiedView_t view);
 /// Fetches a range now, e.g. before passing the memory to a system call such as write().
 clError_t clUnifiedPrefetch(clUnifiedView_t view, size_t offset, size_t bytes);
+/// Declares that the program will overwrite [offset, offset + bytes) without reading it first.
+/// Every chunk lying entirely inside the range is dropped (unsynced changes in it are lost) and
+/// is zero-filled, not fetched, on its next touch; partly covered chunks at the ends are left
+/// alone. The next clUnifiedSync writes those chunks back, so the workers see what was written.
+/// Halves the network traffic of filling a window with new data.
+clError_t clUnifiedDiscard(clUnifiedView_t view, size_t offset, size_t bytes);
 /// Syncs, unmaps the window and frees the cluster memory.
 clError_t clUnifiedClose(clUnifiedView_t view);
 

@@ -151,6 +151,7 @@ struct clUnifiedInfo {
   uint64_t writeFaults;    // first writes to clean chunks
   uint64_t bytesFetched;   // from the workers
   uint64_t bytesWrittenBack;  // to the workers
+  uint64_t bytesDiscarded;    // chunks zero-filled instead of fetched (clUnifiedDiscard)
 };
 
 typedef struct clStream_st* clStream_t;
