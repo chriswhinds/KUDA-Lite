@@ -12,7 +12,8 @@ SPDX-License-Identifier: Apache-2.0 (see the LICENSE file at the project root)
 | `tests/test_unit.cpp` | no | Serialisation (round trips, truncation), free-list allocation and coalescing, allocation page math, address translation (mid-page, cross-page, out of range, unmapped), extent coalescing, kernel-argument packing, `ExecBlocks`/cluster-map encoding, host:port and size parsing, thread pool (coverage, nesting, exception propagation) |
 | `tests/test_memory.cpp` | yes | Striped (64 KiB and 4 KiB pages, odd sizes) and blocked round trips, unaligned cross-worker sub-ranges, memset, device-to-device copy, two streams ordered by an event, event timing, error reporting (out-of-range, unmapped, unknown kernel, double free, bad page size) |
 | `tests/test_matmul.cpp` | yes | Test case 1: SGEMM/DGEMM against a reference with a formal error bound ([MATMUL.md §5](MATMUL.md#5-verification-method)) |
-| `tests/test_unified.cpp` (`cl-test-unified`, only with `KUDALITE_UNIFIED_MEMORY=ON`) | yes | Unified memory view ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)): a slice on every worker, pointer writes then sync, write-back of modified chunks only, invalidate, a kernel on the same memory, concurrent faulting threads, system calls on prefetched memory, device-to-host copies into the window (no deadlock), close releases memory, the largest possible window. Skips (exit 0) when the build or kernel does not support it |
+| `tests/test_unified.cpp` (`cl-test-unified`, only with `KUDALITE_UNIFIED_MEMORY=ON`) | yes | Unified memory view ([UNIFIED_MEMORY.md](UNIFIED_MEMORY.md)): a slice on every worker, pointer writes then sync, write-back of modified chunks only, invalidate, a kernel on the same memory, concurrent faulting threads, system calls on prefetched memory, device-to-host copies into the window (no deadlock), close releases memory, `clUnifiedDiscard` (no fetch, whole chunks only, dropped changes, cancelled by invalidate), the largest possible window. Skips (exit 0) when the build or kernel does not support it |
+| `tools/cl_bench_unified.cpp` (`cl-bench-unified`, with the option) | yes | Benchmark, not a pass/fail test: the same host-side tasks with explicit copies and with the unified view; time and bytes moved ([UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance)) |
 | `examples/saxpy.cpp` | yes | Smallest end-to-end program, using `cl_saxpy` |
 | `tools/cl_info.cpp` | yes | Cluster query; smoke test for connectivity |
 | `tools/cl_top.cpp` | yes | Live telemetry of every node; smoke test for the telemetry path |
@@ -137,6 +138,19 @@ Run on Linux 7.0 x86-64 with a local 3-worker cluster (256 MiB arenas), `vm.unpr
 | Sandbox `install.sh host --unified-memory` | Builds and installs `cl-test-unified`; installed `kudaliteConfig.cmake` sets `KUDALITE_UNIFIED_MEMORY ON` |
 | `write()` from a chunk never touched | `EFAULT`, as documented; `clUnifiedPrefetch` first fixes it |
 
+### Unified memory: write-only hint `clUnifiedDiscard` (release 0.4.1)
+
+Same machine and cluster as above.
+
+| Check | Result |
+|---|---|
+| `cl-test-unified` new sections: discard a whole 48 MiB window, write it, sync | PASS: 0 bytes fetched, 48 MiB zero-filled, 48 MiB written back, data correct on the workers |
+| Discard of a range covering one chunk fully and two partly; unsynced change in the dropped chunk; invalidate after a discard; range past the end; range inside one chunk | PASS: only the whole chunk is zero-filled (2 partial chunks fetched), the change is dropped, invalidate restores the worker data, `clErrorInvalidValue`, nothing dropped |
+| `cl-bench-unified`, filling a 192 MiB window | Without discard: 384 MiB moved, 2.5–3.9× the explicit-copy time. With discard: **192 MiB** moved, 0.9–1.8× |
+| `ctest --preset unified`, `ctest --preset release` (feature off; the new stub returns `clErrorNotSupported`) | 2/2 PASS each |
+| `ctest --preset tsan` | 2/2 PASS, no ThreadSanitizer reports |
+| `examples/unified_memory` (now discards before filling) | Prints `y[0] = 4.0` |
+
 **Not yet verified:** the unified view on real Pi 5 / Orange Pi 6 Plus clusters and kernels (Raspberry Pi OS, Orange Pi Debian), page-fault throughput over real 1 GbE / 5 GbE, macOS (not supported: returns `clErrorNotSupported`).
 
 ## 4. Hardware acceptance plan
@@ -172,4 +186,4 @@ Unified memory view (build with `--unified-memory`; on either platform):
 |---|---|---|
 | U1 | `cl-test-unified` from the host | PASS; write tracking reported "on" (kernel ≥ 5.7) |
 | U2 | `examples/unified_memory` with every worker idle | Window ≥ 80 % of the summed arenas; prints `y[0] = 4.0` |
-| U3 | Sequential read of a 1 GiB window after `clUnifiedInvalidate` | Record MB/s; compare with the estimates in [UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance) (≈ 110 MB/s on 1 GbE, ≈ 550 MB/s on 5 GbE) |
+| U3 | `cl-bench-unified --mib 1024 --runs 3` | Record every row; with `clUnifiedDiscard` the write task moves the same bytes as explicit copies and takes ≤ 1.2× their time; compare the rest with the estimates in [UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance) (≈ 110 MB/s on 1 GbE, ≈ 550 MB/s on 5 GbE) |
