@@ -292,13 +292,13 @@ scripts/package-release.sh
 ```
 
 ```bash
-scp dist/kudalite-0.4.0.tar.gz dist/kudalite-0.4.0.tar.gz.sha256 pi@pi5-w0:
+scp dist/kudalite-0.4.1.tar.gz dist/kudalite-0.4.1.tar.gz.sha256 pi@pi5-w0:
 ```
 
 On the node:
 
 ```bash
-sha256sum -c kudalite-0.4.0.tar.gz.sha256 && tar xzf kudalite-0.4.0.tar.gz && cd kudalite-0.4.0
+sha256sum -c kudalite-0.4.1.tar.gz.sha256 && tar xzf kudalite-0.4.1.tar.gz && cd kudalite-0.4.1
 ```
 
 Then run the command for the node's role:

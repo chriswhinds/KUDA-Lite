@@ -27,7 +27,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(KUDA-Lite
-  VERSION 0.4.0
+  VERSION 0.4.1
   DESCRIPTION "GPU-style compute runtime for ARM SBC clusters (Raspberry Pi 5, Orange Pi 6 Plus)"
   LANGUAGES CXX)
 
@@ -212,8 +212,11 @@ if(KUDALITE_BUILD_TOOLS)
   install(TARGETS cl-info cl-top cl-test-memory cl-test-matmul RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   if(KUDALITE_UNIFIED_MEMORY)
     add_executable(cl-test-unified tests/test_unified.cpp)
-    target_link_libraries(cl-test-unified PRIVATE kudalite kudalite_flags)
-    install(TARGETS cl-test-unified RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    add_executable(cl-bench-unified tools/cl_bench_unified.cpp)
+    foreach(t cl-test-unified cl-bench-unified)
+      target_link_libraries(${t} PRIVATE kudalite kudalite_flags)
+    endforeach()
+    install(TARGETS cl-test-unified cl-bench-unified RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 endif()
 

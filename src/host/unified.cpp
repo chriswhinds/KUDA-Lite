@@ -51,7 +51,8 @@
 
 namespace {
 
-enum ChunkState : uint8_t { kAbsent = 0, kClean = 1, kDirty = 2 };
+// kDiscarded: absent, but zero-filled instead of fetched on the next touch (clUnifiedDiscard).
+enum ChunkState : uint8_t { kAbsent = 0, kClean = 1, kDirty = 2, kDiscarded = 3 };
 constexpr size_t kDefaultChunk = 256 * 1024;
 
 }  // namespace
@@ -80,6 +81,7 @@ struct clUnifiedView_st {
   std::atomic<uint64_t> writeFaults{0};
   std::atomic<uint64_t> bytesFetched{0};
   std::atomic<uint64_t> bytesWritten{0};
+  std::atomic<uint64_t> bytesDiscarded{0};
   std::atomic<int> error{clSuccess};  // first fetch failure, reported by the next sync
 };
 
@@ -111,10 +113,13 @@ void writeProtect(clUnifiedView_st* v, size_t idx, bool protect) {
   }
 }
 
-/// Maps the fetched chunks `idxs` (consecutive in `src`). Caller holds popMu.
-void mapChunks(clUnifiedView_st* v, const std::vector<size_t>& idxs, const uint8_t* src, bool dirty) {
+/// Maps the fetched chunks `idxs` (consecutive in `src`); `dirty[k]` maps chunk k writable and
+/// dirty. Caller holds popMu.
+void mapChunks(clUnifiedView_st* v, const std::vector<size_t>& idxs, const uint8_t* src,
+               const std::vector<bool>& dirtyFlags) {
   for (size_t k = 0; k < idxs.size(); ++k) {
     const size_t idx = idxs[k];
+    const bool dirty = dirtyFlags[k];
     uffdio_copy c{};
     c.dst = reinterpret_cast<uint64_t>(v->base + idx * v->chunk);
     c.src = reinterpret_cast<uint64_t>(src + k * v->chunk);
@@ -133,27 +138,43 @@ void mapChunks(clUnifiedView_st* v, const std::vector<size_t>& idxs, const uint8
   }
 }
 
-/// Fetches and maps the absent chunks among `idxs` (in one batch of transfers).
+/// Fetches and maps the absent chunks among `idxs` (in one batch of transfers). Discarded chunks
+/// are zero-filled instead of fetched, and always mapped dirty so the next sync writes them back.
 void populate(clUnifiedView_st* v, std::vector<size_t> idxs, bool dirty) {
   std::lock_guard<std::mutex> pop(v->popMu);
+  std::vector<bool> discarded;
   {
     std::lock_guard<std::mutex> lk(v->mu);
-    idxs.erase(std::remove_if(idxs.begin(), idxs.end(), [&](size_t i) { return v->state[i] != kAbsent; }),
+    idxs.erase(std::remove_if(idxs.begin(), idxs.end(),
+                              [&](size_t i) { return v->state[i] != kAbsent && v->state[i] != kDiscarded; }),
                idxs.end());
+    for (size_t i : idxs) discarded.push_back(v->state[i] == kDiscarded);
   }
   if (idxs.empty()) return;
   v->staging.resize(idxs.size() * v->chunk);
+  size_t fetched = 0;
   for (size_t k = 0; k < idxs.size(); ++k) {
-    clMemcpyDtoHAsync(v->staging.data() + k * v->chunk, v->dev + idxs[k] * v->chunk, v->chunk, v->fetchStream);
+    uint8_t* dst = v->staging.data() + k * v->chunk;
+    if (discarded[k]) {
+      std::memset(dst, 0, v->chunk);
+      continue;
+    }
+    clMemcpyDtoHAsync(dst, v->dev + idxs[k] * v->chunk, v->chunk, v->fetchStream);
+    ++fetched;
   }
-  const clError_t st = clStreamSynchronize(v->fetchStream);
-  if (st != clSuccess) {
-    recordError(v, st);
-    std::memset(v->staging.data(), 0, v->staging.size());
-  } else {
-    v->bytesFetched += idxs.size() * v->chunk;
+  if (fetched > 0) {
+    const clError_t st = clStreamSynchronize(v->fetchStream);
+    if (st != clSuccess) {
+      recordError(v, st);
+      std::memset(v->staging.data(), 0, v->staging.size());
+    } else {
+      v->bytesFetched += fetched * v->chunk;
+    }
   }
-  mapChunks(v, idxs, v->staging.data(), dirty);
+  v->bytesDiscarded += (idxs.size() - fetched) * v->chunk;
+  std::vector<bool> dirtyFlags(idxs.size());
+  for (size_t k = 0; k < idxs.size(); ++k) dirtyFlags[k] = dirty || discarded[k];
+  mapChunks(v, idxs, v->staging.data(), dirtyFlags);
 }
 
 void handlerLoop(clUnifiedView_st* v) {
@@ -176,7 +197,9 @@ void handlerLoop(clUnifiedView_st* v) {
       ++v->writeFaults;
       {
         std::lock_guard<std::mutex> lk(v->mu);
-        v->state[idx] = kDirty;
+        // A discard may have dropped the chunk since the fault was queued; the writer then
+        // retries and takes a missing fault instead.
+        if (v->state[idx] == kClean) v->state[idx] = kDirty;
       }
       writeProtect(v, idx, false);
       continue;
@@ -340,7 +363,7 @@ clError_t clUnifiedGetInfo(clUnifiedView_t v, clUnifiedInfo* info) {
   {
     std::lock_guard<std::mutex> lk(v->mu);
     for (uint8_t s : v->state) {
-      if (s != kAbsent) info->residentBytes += v->chunk;
+      if (s == kClean || s == kDirty) info->residentBytes += v->chunk;
       if (s == kDirty) info->dirtyBytes += v->chunk;
     }
   }
@@ -348,6 +371,7 @@ clError_t clUnifiedGetInfo(clUnifiedView_t v, clUnifiedInfo* info) {
   info->writeFaults = v->writeFaults.load();
   info->bytesFetched = v->bytesFetched.load();
   info->bytesWrittenBack = v->bytesWritten.load();
+  info->bytesDiscarded = v->bytesDiscarded.load();
   return clSuccess;
 }
 
@@ -358,7 +382,7 @@ clError_t clUnifiedSync(clUnifiedView_t v) {
   {
     std::lock_guard<std::mutex> lk(v->mu);
     for (size_t i = 0; i < v->chunks; ++i) {
-      if (v->writeTracking ? v->state[i] == kDirty : v->state[i] != kAbsent) {
+      if (v->writeTracking ? v->state[i] == kDirty : (v->state[i] == kClean || v->state[i] == kDirty)) {
         idxs.push_back(i);
         v->state[i] = kClean;
       }
@@ -384,9 +408,10 @@ clError_t clUnifiedInvalidate(clUnifiedView_t v) {
   std::lock_guard<std::mutex> pop(v->popMu);
   std::lock_guard<std::mutex> lk(v->mu);
   for (size_t i = 0; i < v->chunks; ++i) {
-    if (v->state[i] == kAbsent) continue;
-    madvise(v->base + i * v->chunk, v->chunk, MADV_DONTNEED);  // next access faults again
-    v->state[i] = kAbsent;
+    if (v->state[i] == kClean || v->state[i] == kDirty) {
+      madvise(v->base + i * v->chunk, v->chunk, MADV_DONTNEED);  // next access faults again
+    }
+    v->state[i] = kAbsent;  // also cancels a pending discard: the next touch fetches
   }
   return st;
 }
@@ -402,6 +427,23 @@ clError_t clUnifiedPrefetch(clUnifiedView_t v, size_t offset, size_t bytes) {
     populate(v, std::vector<size_t>(idxs.begin() + b, idxs.begin() + std::min(idxs.size(), b + kBatch)), false);
   }
   return static_cast<clError_t>(v->error.load());
+}
+
+clError_t clUnifiedDiscard(clUnifiedView_t v, size_t offset, size_t bytes) {
+  if (v == nullptr) return clErrorInvalidResourceHandle;
+  if (offset > v->bytes || bytes > v->bytes - offset) return clErrorInvalidValue;
+  const size_t first = (offset + v->chunk - 1) / v->chunk;  // whole chunks only: round inward
+  const size_t last = (offset + bytes) / v->chunk;         // exclusive
+  std::lock_guard<std::mutex> sync(v->syncMu);  // not while a sync is copying these chunks out
+  std::lock_guard<std::mutex> pop(v->popMu);
+  std::lock_guard<std::mutex> lk(v->mu);
+  for (size_t i = first; i < last; ++i) {
+    if (v->state[i] == kClean || v->state[i] == kDirty) {
+      madvise(v->base + i * v->chunk, v->chunk, MADV_DONTNEED);  // next access faults again
+    }
+    v->state[i] = kDiscarded;
+  }
+  return clSuccess;
 }
 
 clError_t clUnifiedClose(clUnifiedView_t v) {
@@ -455,6 +497,7 @@ clError_t clUnifiedGetInfo(clUnifiedView_t, clUnifiedInfo*) { return clErrorNotS
 clError_t clUnifiedSync(clUnifiedView_t) { return clErrorNotSupported; }
 clError_t clUnifiedInvalidate(clUnifiedView_t) { return clErrorNotSupported; }
 clError_t clUnifiedPrefetch(clUnifiedView_t, size_t, size_t) { return clErrorNotSupported; }
+clError_t clUnifiedDiscard(clUnifiedView_t, size_t, size_t) { return clErrorNotSupported; }
 clError_t clUnifiedClose(clUnifiedView_t) { return clErrorNotSupported; }
 
 #endif

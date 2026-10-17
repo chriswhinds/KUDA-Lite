@@ -192,6 +192,39 @@ int main(int argc, char** argv) {
   CHECK(std::memcmp(check.data(), src.data(), check.size()) == 0);
   CHECK_OK(clFree(other));
 
+  section("discard: overwrite without fetching");
+  CHECK_OK(clUnifiedInvalidate(view));
+  CHECK_OK(clUnifiedGetInfo(view, &info));
+  uint64_t fetched0 = info.bytesFetched, written0 = info.bytesWrittenBack, discarded0 = info.bytesDiscarded;
+  CHECK_OK(clUnifiedDiscard(view, 0, bytes));
+  for (size_t i = 0; i < bytes; ++i) base[i] = pattern(i, 9);
+  CHECK_OK(clUnifiedSync(view));
+  CHECK_OK(clUnifiedGetInfo(view, &info));
+  CHECK(info.bytesFetched == fetched0);  // nothing came over the network
+  CHECK(info.bytesDiscarded - discarded0 == bytes);
+  CHECK(info.bytesWrittenBack - written0 == bytes);
+  CHECK_OK(clMemcpyDtoH(host.data(), info.devPtr, bytes));
+  ok = true;
+  for (size_t i = 0; i < bytes && ok; ++i) ok = host[i] == pattern(i, 9);
+  CHECK(ok);
+
+  section("discard: only whole chunks, unsynced changes dropped, invalidate cancels");
+  CHECK_OK(clUnifiedInvalidate(view));
+  base[2 * chunk] = 0xAB;  // unsynced change in a chunk about to be discarded
+  CHECK_OK(clUnifiedGetInfo(view, &info));
+  fetched0 = info.bytesFetched;
+  CHECK_OK(clUnifiedDiscard(view, chunk + 1, 2 * chunk));  // covers chunk 2 fully, 1 and 3 partly
+  CHECK(base[2 * chunk] == 0 && base[3 * chunk - 1] == 0);  // zero-filled, not fetched
+  CHECK(base[chunk] == pattern(chunk, 9) && base[3 * chunk + 5] == pattern(3 * chunk + 5, 9));
+  CHECK_OK(clUnifiedGetInfo(view, &info));
+  CHECK(info.bytesFetched - fetched0 == 2 * chunk);  // chunks 1 and 3 only
+  CHECK_OK(clUnifiedDiscard(view, 6 * chunk, chunk));
+  CHECK_OK(clUnifiedInvalidate(view));  // cancels the pending discard of chunk 6
+  CHECK(base[6 * chunk + 3] == pattern(6 * chunk + 3, 9));
+  CHECK(clUnifiedDiscard(view, bytes, 1) == clErrorInvalidValue);
+  CHECK_OK(clUnifiedDiscard(view, 5, 10));  // inside one chunk: nothing to drop
+  CHECK(base[5] == pattern(5, 9));
+
   section("close releases the cluster memory");
   CHECK_OK(clUnifiedClose(view));
   const std::vector<uint64_t> closed = workerUsage();

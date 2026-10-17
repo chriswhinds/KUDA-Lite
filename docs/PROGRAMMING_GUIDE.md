@@ -20,7 +20,7 @@ Header: [`include/kudalite/kudalite.h`](../include/kudalite/kudalite.h). Every c
 | Events | `clEventCreate/Destroy/Record/Synchronize/Query/ElapsedTime` | `cudaEvent*` |
 | Launch | `clLaunchKernel(name, grid, block, args, bytes, stream)`, `clLaunch(name, grid, block, stream, args...)` | `cudaLaunchKernel`, `<<< >>>` |
 | Sync | `clDeviceSynchronize()`, `clGetLastLaunchInfo(stream, &info)` | `cudaDeviceSynchronize` |
-| Unified memory (optional build) | `clUnifiedOpen/GetInfo/Sync/Invalidate/Prefetch/Close` ([Unified memory](UNIFIED_MEMORY.md)) | `cudaMallocManaged` (similar idea, different consistency rules) |
+| Unified memory (optional build) | `clUnifiedOpen/GetInfo/Sync/Invalidate/Prefetch/Discard/Close` ([Unified memory](UNIFIED_MEMORY.md)) | `cudaMallocManaged` (similar idea, different consistency rules) |
 | BLAS | `clblasSgemm`, `clblasDgemm`, `clblasSaxpy` ([`clblas.h`](../include/kudalite/clblas.h)) | cuBLAS |
 
 ### Connecting
@@ -130,7 +130,8 @@ clUnifiedOpen(&view, 1ull << 30, 0);           // 1 GiB, spread over all workers
 clUnifiedInfo info;
 clUnifiedGetInfo(view, &info);
 float* a = static_cast<float*>(info.base);
-for (size_t i = 0; i < n; ++i) a[i] = f(i);    // first touch of each chunk fetches it
+clUnifiedDiscard(view, 0, n * sizeof(float));  // new data: don't fetch the old contents
+for (size_t i = 0; i < n; ++i) a[i] = f(i);    // first touch maps a zeroed chunk
 clUnifiedSync(view);                            // release: kernels may now read it
 clLaunch("my_kernel", grid, block, nullptr, info.devPtr, n);
 clStreamSynchronize(nullptr);
@@ -139,7 +140,7 @@ use(a[0]);
 clUnifiedClose(view);
 ```
 
-Rules: sync after writing through the pointer, and invalidate before reading what others wrote. Prefetch before passing window memory to system calls. Without the build option the functions return `clErrorNotSupported`. Full details: [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
+Rules: sync after writing through the pointer, and invalidate before reading what others wrote. Discard a range before overwriting it with new data (this halves the network traffic). Prefetch before passing window memory to system calls. Without the build option the functions return `clErrorNotSupported`. Full details: [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
 
 ## 4. Differences from NVIDIA CUDA
 

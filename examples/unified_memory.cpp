@@ -32,9 +32,10 @@ int main() {
   clUnifiedGetInfo(view, &info);
   std::printf("%zu MiB across %u workers, mapped at %p\n", info.bytes >> 20, info.workers, info.base);
 
-  // Plain pointer access: the first touch of each chunk fetches it from its worker.
+  // Plain pointer access: the first touch of each chunk maps it in (fetched, or zeroed after a discard).
   float* data = static_cast<float*>(info.base);
   const size_t n = 1u << 22;  // use the first 16 MiB here
+  clUnifiedDiscard(view, 0, 2 * n * sizeof(float));  // all new data: skip fetching the old contents
   for (size_t i = 0; i < 2 * n; ++i) data[i] = 1.0f;
 
   // Release: push the writes to the workers, then let a kernel work on the same memory.

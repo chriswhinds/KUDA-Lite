@@ -34,7 +34,7 @@ ctest --preset release
 | `pi5-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Pi 5 binaries (daemons + tools, no tests) |
 | `opi6plus` | an Orange Pi 6 Plus | everything, tuned for the CIX P1: `-mcpu=cortex-a720`, falling back to `cortex-a710`, `armv9-a`, `armv8.2-a` as the compiler allows (Debian 12's GCC 12 gets `cortex-a710`) |
 | `opi6plus-cross` | x86-64 Linux with `g++-aarch64-linux-gnu` | Orange Pi 6 Plus binaries (daemons + tools, no tests) |
-| `unified` | any Linux machine | `release` plus the optional unified memory view (`KUDALITE_UNIFIED_MEMORY=ON`) and `cl-test-unified` |
+| `unified` | any Linux machine | `release` plus the optional unified memory view (`KUDALITE_UNIFIED_MEMORY=ON`), `cl-test-unified` and `cl-bench-unified` |
 | `host` | macOS, or a Linux machine that only runs programs | `libkudalite` + `cl-info`, `cl-top`, `cl-test-*`, `saxpy` |
 | `debug` | development | debug build, warnings are errors |
 | `tsan` | development | ThreadSanitizer build, with the unified memory view; `ctest --preset tsan` runs the integration test under it |
@@ -69,6 +69,7 @@ Pass options as `-D<NAME>=<value>` when configuring.
 | `cl-info`, `cl-top` | `bin/` | cluster query, live telemetry |
 | `cl-test-memory`, `cl-test-matmul` | `bin/` | cluster acceptance tests (`tests/test_memory.cpp`, `tests/test_matmul.cpp`) |
 | `cl-test-unified` | `bin/` (with `KUDALITE_UNIFIED_MEMORY`) | unified memory view acceptance test; also run by the integration test |
+| `cl-bench-unified` | `bin/` (with `KUDALITE_UNIFIED_MEMORY`) | unified view vs. explicit copies benchmark ([UNIFIED_MEMORY.md §5](UNIFIED_MEMORY.md#5-performance)) |
 | `unified_memory` | source in `share/kudalite/examples/` | unified memory example (built with the option) |
 | `saxpy` | source only, in `share/kudalite/examples/` | example program |
 | `test_unit` | not installed | unit tests |

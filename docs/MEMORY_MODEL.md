@@ -112,5 +112,5 @@ So a `read2D` of 128 rows spread over 4 workers costs **one round trip** (4 conc
 
 ## 8. Unified memory view (optional)
 
-Built with `KUDALITE_UNIFIED_MEMORY`, a host process can map one **blocked** allocation, one contiguous slice per worker laid back to back, as a continuous range of ordinary memory. Chunks are fetched on first touch through `userfaultfd` and written back on `clUnifiedSync`. The view adds no new consistency rules: `clUnifiedSync` is a release (like finishing a copy to the device), and `clUnifiedInvalidate` is an acquire (like copying back from it). See [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
+Built with `KUDALITE_UNIFIED_MEMORY`, a host process can map one **blocked** allocation, one contiguous slice per worker laid back to back, as a continuous range of ordinary memory. Chunks are fetched on first touch through `userfaultfd` and written back on `clUnifiedSync`. The view adds no new consistency rules: `clUnifiedSync` is a release (like finishing a copy to the device), and `clUnifiedInvalidate` is an acquire (like copying back from it). `clUnifiedDiscard` declares a range's old contents unwanted: its chunks are zero-filled on next touch instead of fetched, the same as overwriting a device buffer with a fresh `clMemcpyHtoD`. See [UNIFIED_MEMORY.md](UNIFIED_MEMORY.md).
 
